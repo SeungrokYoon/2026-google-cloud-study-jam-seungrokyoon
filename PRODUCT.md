@@ -27,11 +27,17 @@ Calm, direct, and dependable. The product should reduce pressure at every step, 
 
 ## Design Principles
 
-1. One clear task per state: language, permission, venue, menu, steering, or payment.
-2. Audio leads and visuals confirm: every visible state must support, never replace, the spoken journey.
-3. Recognition over recall: keep the current step, next action, and recovery action continuously available.
-4. Safe by default: permission denial, speech failure, and network failure always expose a concrete retry or manual fallback.
-5. Separate roles: assistance is the default experience; contribution and demo tooling remain available without competing with the order journey.
+1. Blind users come first: every product and engineering decision starts with independent use by blind and low-vision people.
+2. Perception before presentation: accurate camera recognition and reliable state detection take priority over visible UI polish.
+3. Audio is the primary interface: guidance must be precise, contextual, friendly, and actionable; visuals only confirm the spoken journey.
+4. One clear task per state: language, permission, venue, menu, steering, or payment.
+5. Recognition over recall: keep the current step, next action, and recovery action continuously available.
+6. Safe by default: permission denial, speech failure, and network failure always expose a concrete retry or manual fallback.
+7. Separate roles: assistance is the default experience; contribution and demo tooling remain available without competing with the order journey.
+
+## Product Priority Order
+
+When tradeoffs are required, use this order: video recognition accuracy, spoken guidance quality, failure recovery, interaction reliability, and then visible UI refinement. A visually polished screen is not considered successful when recognition or spoken guidance is vague, inaccurate, delayed, or difficult to act on.
 
 ## Accessibility & Inclusion
 
