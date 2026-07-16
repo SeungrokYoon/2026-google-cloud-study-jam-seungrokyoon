@@ -1,26 +1,38 @@
-# Node.js LTS 경량 이미지 사용
-FROM node:18-slim as builder
+# =======================================================================
+# 🐳 Echo-Menu 3.0: 고성능 pnpm 멀티스테이지 경량화 Dockerfile
+# =======================================================================
 
-# 작업 디렉토리 지정
+# 1단계: 빌드 및 의존성 캐싱 스테이지
+FROM node:22-slim as builder
+
+# pnpm 설치 및 작업 폴더 세팅
+RUN npm install -g pnpm@10.29.3
 WORKDIR /app
 
-# 의존성 복사 및 설치
-COPY package*.json ./
-RUN npm ci
+# lockfile 기준 패키지 고속 설치
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
-# 소스코드 전체 복사 및 Vite 빌드 실행
+# 전체 소스 복사 및 Vite 프론트엔드 프로덕션 번들링
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
-# 실행용 경량 스테이지 구성
-FROM node:18-slim
+# 프로덕션 운영에 불필요한 devDependencies 원격 트리쉐이킹 (Pruning)
+RUN pnpm prune --prod
+
+# =======================================================================
+# 2단계: 최적화 경량화 실행용 스테이지
+FROM node:22-slim
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
+
+# 빌더 스테이지에서 컴파일된 에셋 및 경량 노드 모듈즈 복사
+COPY package.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY server.js .
-COPY db_cache.json ./db_cache.json
 
-# 포트 개방 및 시작 명령어
+# 애플리케이션 포트 개방
 EXPOSE 3000
-CMD ["npm", "start"]
+
+# Express 서버 직송 엔진 기동
+CMD ["node", "server.js"]
