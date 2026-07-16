@@ -68,6 +68,7 @@ const navAssist = document.getElementById("nav-assist") as HTMLButtonElement;
 const navContribute = document.getElementById("nav-contribute") as HTMLButtonElement;
 const assistView = document.getElementById("assist-view") as HTMLElement;
 const contributeView = document.getElementById("contribute-view") as HTMLElement;
+const permissionChoiceSurface = document.getElementById("permission-choice-surface") as HTMLElement;
 
 const tabLeaderboard = document.getElementById("tab-btn-leaderboard") as HTMLButtonElement;
 const tabContribute = document.getElementById("tab-btn-contribute") as HTMLButtonElement;
@@ -209,6 +210,9 @@ let isVoiceTurningOffConfirm: boolean = false; // 음성 기능 해제 확인용
 
 // [추가] 배리어프리 권한 획득 성공여부 트래킹
 let isPermissionGranted: boolean = false;
+let isPermissionChoicePending: boolean = false;
+let permissionTapCount: number = 0;
+let permissionTapTimer: number | null = null;
 let onboardingState: "looping" | "confirming" | "completed" = "looping";
 let venueConfirmationPending: boolean = false;
 let isKioskNavigationActive: boolean = false;
@@ -446,6 +450,84 @@ window.addEventListener("DOMContentLoaded", () => {
 
 let isPermissionRequested = false;
 
+function showPermissionChoice() {
+  if (isPermissionRequested || isPermissionGranted) return;
+
+  isPermissionChoicePending = true;
+  permissionTapCount = 0;
+  if (permissionTapTimer !== null) clearTimeout(permissionTapTimer);
+  permissionTapTimer = null;
+  permissionChoiceSurface.hidden = false;
+  permissionChoiceSurface.focus();
+
+  const prompt = "카메라와 마이크를 사용할까요? 허락은 화면 아무 곳이나 한 번, 사용하지 않기는 두 번 탭하세요. 한 번 탭하면 브라우저 권한 창이 열립니다.";
+  speak(prompt);
+  updateSubtitle(prompt);
+  hapticInstructionText.textContent = "한 번 탭하면 허용을 진행하고, 두 번 탭하면 사용하지 않습니다.";
+  setJourneyStep(
+    "permission",
+    "카메라와 마이크를 사용할까요?",
+    "화면 아무 곳이나 한 번 탭하면 허용, 두 번 탭하면 사용하지 않습니다.",
+    "권한 선택"
+  );
+}
+
+function resolvePermissionChoice(allow: boolean) {
+  if (!isPermissionChoicePending) return;
+
+  isPermissionChoicePending = false;
+  permissionTapCount = 0;
+  if (permissionTapTimer !== null) clearTimeout(permissionTapTimer);
+  permissionTapTimer = null;
+  permissionChoiceSurface.hidden = true;
+
+  if (allow) {
+    const browserPrompt = "허락을 선택했습니다. 이제 브라우저 권한 창이 열리면 허용 버튼을 눌러주세요.";
+    speak(browserPrompt);
+    updateSubtitle(browserPrompt);
+    initAccessibilityPermissions();
+    return;
+  }
+
+  const declinedPrompt = "카메라와 마이크를 사용하지 않습니다. 영상 인식과 음성 안내를 사용하려면 권한이 필요합니다. 언제든 다시 선택할 수 있습니다.";
+  speak(declinedPrompt);
+  updateSubtitle(declinedPrompt);
+  hapticInstructionText.textContent = "권한을 다시 선택하려면 아래 버튼을 누르거나 화면을 두 번 탭하세요.";
+  setJourneyStep(
+    "permission",
+    "권한을 사용하지 않습니다",
+    "영상 인식과 음성 안내를 사용하려면 카메라와 마이크 권한이 필요합니다.",
+    "권한 다시 선택"
+  );
+}
+
+function registerPermissionTap() {
+  if (!isPermissionChoicePending) return;
+
+  permissionTapCount += 1;
+  if (permissionTapCount >= 2) {
+    resolvePermissionChoice(false);
+    return;
+  }
+
+  navigator.vibrate?.(40);
+  permissionTapTimer = window.setTimeout(() => resolvePermissionChoice(true), 360);
+}
+
+permissionChoiceSurface.addEventListener("pointerup", registerPermissionTap);
+permissionChoiceSurface.addEventListener("click", (event) => {
+  if (event.detail === 0) resolvePermissionChoice(true);
+});
+permissionChoiceSurface.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    resolvePermissionChoice(true);
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    resolvePermissionChoice(false);
+  }
+});
+
 function initAccessibilityPermissions() {
   if (isPermissionRequested) return;
   isPermissionRequested = true;
@@ -493,8 +575,10 @@ function initAccessibilityPermissions() {
     .then(async (stream) => {
       console.log("📹 카메라/마이크 권한 승인 완료");
       isPermissionGranted = true;
-      cameraStream = stream;
-      cameraFeed.srcObject = stream;
+      const videoTracks = stream.getVideoTracks();
+      stream.getAudioTracks().forEach((track) => track.stop());
+      cameraStream = videoTracks.length > 0 ? new MediaStream(videoTracks) : stream;
+      cameraFeed.srcObject = cameraStream;
       void cameraFeed.play().catch(() => undefined);
 
       const successNotice = pLocale.permissionSuccess;
@@ -695,15 +779,14 @@ function handleTouchpadDoubleTap() {
       "카메라·마이크 허용하기"
     );
 
-    // 최종 확인 즉시 Audio 및 비전 권한 획득 플로우 시동!
-    initAccessibilityPermissions();
+    showPermissionChoice();
     return;
   }
 
   // 4. 언어 세팅 완료 후의 일반적인 주문 더블탭
   if (savedLang) {
     if (!isPermissionGranted) {
-      initAccessibilityPermissions();
+      showPermissionChoice();
     } else {
       startVenueIdentificationSequence();
     }
@@ -832,28 +915,84 @@ function startSpeechRecognition(onResultCallback: (text: string) => void) {
   recognition.lang = langSelectorPrompts[userLang]?.locale || "ko-KR";
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
+  recognition.continuous = false;
 
-  micWaveEffect.classList.add("listening");
-  recognition.start();
+  let receivedResult = false;
+  let recognitionFailed = false;
+  let recognitionTimer: number | null = null;
+
+  const finishListening = () => {
+    micWaveEffect.classList.remove("listening");
+    if (recognitionTimer !== null) clearTimeout(recognitionTimer);
+    recognitionTimer = null;
+  };
 
   recognition.onresult = (event: any) => {
-    const text = event.results[0][0].transcript;
+    const text = event.results[0][0].transcript.trim();
+    if (!text) return;
+    receivedResult = true;
+    finishListening();
     console.log("🎤 음성인식 인식 결과:", text);
     onResultCallback(text);
   };
 
-  recognition.onspeechend = () => {
-    recognition.stop();
-    micWaveEffect.classList.remove("listening");
+  recognition.onaudiostart = () => {
+    updateSubtitle("마이크가 켜졌습니다. 띵동 소리 뒤에 말씀해 주세요.");
   };
 
-  recognition.onerror = () => {
-    micWaveEffect.classList.remove("listening");
-    const retryMessage = "잘 듣지 못했습니다. 다시 말하거나 매장 이름을 직접 입력해 주세요.";
+  recognition.onspeechstart = () => {
+    updateSubtitle("음성을 듣고 있습니다. 말씀을 마치면 잠시 기다려주세요.");
+  };
+
+  recognition.onspeechend = () => {
+    recognition.stop();
+  };
+
+  recognition.onerror = (event: any) => {
+    recognitionFailed = true;
+    finishListening();
+    const messages: Record<string, string> = {
+      "not-allowed": "마이크 권한이 꺼져 있습니다. 브라우저 설정에서 마이크를 허용한 뒤 다시 시도해 주세요.",
+      "service-not-allowed": "이 브라우저에서 음성 인식 사용이 차단되었습니다. 브라우저 설정을 확인해 주세요.",
+      "audio-capture": "마이크를 사용할 수 없습니다. 다른 앱이 마이크를 사용 중인지 확인한 뒤 다시 시도해 주세요.",
+      "no-speech": "음성을 듣지 못했습니다. 띵동 소리가 끝난 뒤 음식점 이름을 다시 말씀해 주세요.",
+      network: "음성 인식 서버에 연결하지 못했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요."
+    };
+    const retryMessage = messages[event.error] || "음성을 정확히 듣지 못했습니다. 다시 말하거나 매장 이름을 직접 입력해 주세요.";
     speak(retryMessage);
     updateSubtitle(retryMessage);
+    hapticInstructionText.textContent = "안내 다시 듣기를 눌러 재시도하거나 매장 이름을 직접 입력하세요.";
     venueFallbackForm.hidden = false;
   };
+
+  recognition.onend = () => {
+    finishListening();
+    if (receivedResult || recognitionFailed) return;
+    const retryMessage = "음성이 입력되기 전에 듣기가 끝났습니다. 띵동 소리 뒤에 다시 말씀해 주세요.";
+    speak(retryMessage);
+    updateSubtitle(retryMessage);
+  };
+
+  micWaveEffect.classList.add("listening");
+  recognitionTimer = window.setTimeout(() => {
+    if (receivedResult || recognitionFailed) return;
+    recognitionFailed = true;
+    recognition.stop();
+    finishListening();
+    const timeoutMessage = "10초 동안 음성을 듣지 못했습니다. 안내 다시 듣기를 눌러 재시도해 주세요.";
+    speak(timeoutMessage);
+    updateSubtitle(timeoutMessage);
+  }, 10_000);
+
+  try {
+    recognition.start();
+  } catch (error) {
+    recognitionFailed = true;
+    finishListening();
+    const startErrorMessage = "마이크를 시작하지 못했습니다. 잠시 기다린 뒤 다시 시도해 주세요.";
+    speak(startErrorMessage);
+    updateSubtitle(startErrorMessage);
+  }
 }
 
 // 주변 매장 자동 GPS 스캔 및 AI 음성 브리핑 개시
