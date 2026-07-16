@@ -27,6 +27,10 @@ db_cache.json
 .DS_Store
 Thumbs.db
 
+# Local analysis and browser test artifacts
+.codebase-memory/
+test-results/
+playwright-report/
+
 # Large PDF guidebooks
 *.pdf
-

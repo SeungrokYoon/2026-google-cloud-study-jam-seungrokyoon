@@ -14,12 +14,14 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "dist")));
 
 // Gemini API Key 검증 및 SDK 초기화
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GCLOUD_API_KEY || process.env.GEMINI_API_KEY;
+const googleMapsApiKey = process.env.GOOGLE_MAPS_KEY || process.env.GOOGLE_MAPS_API_KEY;
+const geminiModel = process.env.GEMINI_MODEL || "gemini-3.5-flash";
 let genAI = null;
 if (apiKey) {
   genAI = new GoogleGenerativeAI(apiKey);
 } else {
-  console.warn("⚠️ WARNING: GEMINI_API_KEY가 설정되지 않았습니다. 실시간 비전 처리가 Mock 데이터로 작동합니다.");
+  console.warn("⚠️ WARNING: GCLOUD_API_KEY가 설정되지 않았습니다. 실시간 비전 처리가 Mock 데이터로 작동합니다.");
 }
 
 // 모의 Firestore/인메모리 DB 구성
@@ -49,47 +51,98 @@ const setupLeaderboard = () => {
 setupLeaderboard();
 
 // 0. 주변 매장 스캔 및 AI 오디오 질문 브리핑 API
-app.post("/api/venue-assist", (req, res) => {
+app.post("/api/venue-assist", async (req, res) => {
   try {
     const { gps } = req.body;
-    // 실제 해커톤 현장에서는 Firestore에서 현재 위경도 근처 100m 이내 매장 쿼리를 실행함
-    const mockNearby = ["스타벅스 신라호텔점", "맥도날드 홍대점"];
-    
-    const audioPrompt = `현재 위성 위치 기준 주변 100미터 이내에 ${mockNearby.join("과 ")}이 있습니다. 지금 방문하신 음식점이 어디인가요?`;
+    if (!gps || !Number.isFinite(gps.lat) || !Number.isFinite(gps.lng)) {
+      return res.status(400).json({ error: "현재 위치 좌표가 필요합니다." });
+    }
+
+    let nearbyVenues = [];
+    let source = "manual-fallback";
+
+    if (googleMapsApiKey) {
+      const placesResponse = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": googleMapsApiKey,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.shortFormattedAddress"
+        },
+        body: JSON.stringify({
+          includedTypes: ["restaurant", "cafe", "bakery", "meal_takeaway"],
+          maxResultCount: 8,
+          rankPreference: "DISTANCE",
+          languageCode: "ko",
+          locationRestriction: {
+            circle: {
+              center: { latitude: gps.lat, longitude: gps.lng },
+              radius: 100
+            }
+          }
+        })
+      });
+
+      if (!placesResponse.ok) {
+        const placesError = await placesResponse.text();
+        throw new Error(`Places API error ${placesResponse.status}: ${placesError}`);
+      }
+
+      const placesData = await placesResponse.json();
+      nearbyVenues = (placesData.places || []).map((place) => ({
+        id: place.id,
+        name: place.displayName?.text,
+        address: place.shortFormattedAddress || ""
+      })).filter((place) => place.name);
+      source = "google-places-nearby";
+    }
+
+    const venueNames = nearbyVenues.map((venue) => venue.name);
+    const audioPrompt = venueNames.length > 0
+      ? `현재 위치에서 가까운 음식점은 ${venueNames.slice(0, 5).join(", ")}입니다. 목록에 없더라도 괜찮습니다. 지금 방문한 음식점은 어디인가요?`
+      : "주변 음식점 목록을 불러오지 못했습니다. 지금 방문한 음식점은 어디인가요?";
     
     res.json({
-      venues: mockNearby,
-      audioPrompt: audioPrompt
+      venues: nearbyVenues,
+      source,
+      audioPrompt
     });
   } catch (error) {
-    res.status(500).json({ error: "주변 매장 정보 스캔 실패" });
+    console.error("Nearby venue search error:", error);
+    res.json({
+      venues: [],
+      source: "manual-fallback",
+      audioPrompt: "주변 음식점 목록을 불러오지 못했습니다. 지금 방문한 음식점은 어디인가요?"
+    });
   }
 });
 
 // 1. 대화형 지능형 매장 특정 및 캐싱 API (Venue Detection & AI Matching)
 app.post("/api/venue", async (req, res) => {
   try {
-    const { name, gps } = req.body;
+    const { name, gps, nearbyVenues = [] } = req.body;
     if (!name) return res.status(400).json({ error: "매장명이 필요합니다." });
 
     const cleanName = name.trim().toLowerCase();
     const db = getDB();
 
     // 주변 감지된 후보지 목록 (GPS 기준 가상 탐색)
-    const nearbyVenues = ["스타벅스 신라호텔점", "맥도날드 홍대점"];
+    const nearbyVenueNames = nearbyVenues
+      .map((venue) => typeof venue === "string" ? venue : venue.name)
+      .filter(Boolean);
     let targetVenueName = name;
 
     // Gemini API를 연동하여 사용자의 모호한 음성 답변("맥도날드")을 주변 후보 목록 중 최적 지점으로 매핑 (AI 특정)
-    if (genAI) {
+    if (genAI && nearbyVenueNames.length > 0) {
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: geminiModel });
         const matchPrompt = `
 당신은 배리어프리 지도 매칭 AI 에이전트입니다.
 사용자가 현재 스마트폰 GPS 주변에서 감지된 식당 목록을 듣고, 아래와 같이 음성으로 답했습니다.
 사용자의 답변과 가장 일치하는 매장 명칭을 주변 목록에서 정확히 매칭해 주십시오.
 
 [주변 식당 후보 목록]
-${nearbyVenues.map(v => `- ${v}`).join("\n")}
+${nearbyVenueNames.length > 0 ? nearbyVenueNames.map(v => `- ${v}`).join("\n") : "- 위치 기반 후보 없음"}
 
 [사용자 음성 대답]
 "${name}"
@@ -99,7 +152,7 @@ ${nearbyVenues.map(v => `- ${v}`).join("\n")}
         const matchResult = await model.generateContent(matchPrompt);
         const matchedText = matchResult.response.text().trim();
         console.log(`🤖 [AI 매장 특정] 입력: "${name}" ➔ 매칭 결과: "${matchedText}"`);
-        if (matchedText) {
+        if (matchedText && matchedText !== "위치 기반 후보 없음") {
           targetVenueName = matchedText;
         }
       } catch (geminiErr) {
@@ -196,7 +249,7 @@ app.post("/api/analyze-frame", async (req, res) => {
     };
 
     // Gemini 2.0 Flash 초고속 모델 로드
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); // 최신 gemini-2.5-flash 또는 gemini-2.0-flash 매핑
+    const model = genAI.getGenerativeModel({ model: geminiModel });
 
     // 비전 추론 프롬프트 구성
     const prompt = `

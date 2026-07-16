@@ -101,9 +101,9 @@ gcloud run deploy echo-menu-app \
     --region=asia-northeast3 \
     --max-instances=3 \
     --allow-unauthenticated \
-    --set-env-vars="GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE"
+    --set-env-vars="GCLOUD_API_KEY=YOUR_GCLOUD_API_KEY_HERE,GOOGLE_MAPS_KEY=YOUR_GOOGLE_MAPS_KEY_HERE"
 
 echo -e "\n${GREEN}[6/6] 🎉 인프라 자동화 및 Cloud Run 서버 배포가 최종 완료되었습니다!${NC}"
 echo -e "위 안내된 Cloud Run URL 주소로 프론트엔드가 퍼블릭 오픈되었습니다."
-echo -e "Gemini API 호출을 실가동하려면 배포된 환경변수에 실제 API Key를 매핑해 주세요."
+echo -e "Gemini 및 Google Places 호출을 실가동하려면 배포된 환경변수에 실제 API Key를 매핑해 주세요."
 echo -e "${BLUE}=====================================================${NC}"

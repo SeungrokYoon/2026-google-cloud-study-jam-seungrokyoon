@@ -1,13 +1,15 @@
 name: Deploy to Google Cloud Run
 
 on:
-  push:
-    branches:
-      - main  # main 브랜치 푸시 시 자동 배포 기동
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} # GitHub Secrets에 등록할 GCP 프로젝트 ID
-  SERVICE_NAME: echo-menu-service
+  SERVICE_NAME: echo-menu-app
   REGION: asia-northeast3
   ARTIFACT_REPOSITORY: echo-menu-repo # Artifact Registry 저장소 이름
 
@@ -17,17 +19,18 @@ jobs:
     steps:
     # 1. 깃 체크아웃
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
-    # 2. 구글 클라우드 인증 (서비스 계정 키 주입)
+    # 2. 구글 클라우드 인증 (GitHub OIDC 단기 토큰)
     - name: Google Cloud Auth
-      uses: google-github-actions/auth@v1
+      uses: google-github-actions/auth@v3
       with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }} # GitHub Secrets에 등록할 서비스 계정 JSON 키
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
     # 3. Cloud SDK 설정
     - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v1
+      uses: google-github-actions/setup-gcloud@v3
       with:
         project_id: ${{ env.PROJECT_ID }}
 
@@ -52,4 +55,4 @@ jobs:
           --region ${{ env.REGION }} \
           --platform managed \
           --allow-unauthenticated \
-          --set-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
+          --set-env-vars="GCLOUD_API_KEY=${{ secrets.GCLOUD_API_KEY }},GOOGLE_MAPS_KEY=${{ secrets.GOOGLE_MAPS_KEY }}"

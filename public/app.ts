@@ -2,6 +2,8 @@
 // Echo-Menu 3.0: Frontend Core Script (TypeScript)
 // ==========================================
 
+export {};
+
 // window 객체 전역 타입 확장 선언 (Vite/TS 컴파일용)
 declare global {
   interface Window {
@@ -24,7 +26,9 @@ let currentCart: any[] = [];
 let targetMenuItem: any = null;
 let isVoiceMode: boolean = true; // 최초 온보딩에서 분기됨
 let isFreezed: boolean = false; // Screen Freeze 여부
+let isPauseMode: boolean = false;
 let streamInterval: any = null;
+let cameraStream: MediaStream | null = null;
 
 // 가상 손가락 좌표 (시연용: 화면 상의 마우스 위치를 가상 손끝 좌표로 연동)
 let fingerX: number = 240;
@@ -49,11 +53,73 @@ const hapticInstructionText = document.getElementById("haptic-instruction-text")
 const compassArrowPtr = document.getElementById("compass-arrow-ptr") as HTMLElement;
 const compassLabelText = document.getElementById("compass-label-text") as HTMLElement;
 const zeroUiTouchpad = document.getElementById("zero-ui-touchpad") as HTMLElement;
+const cameraFeed = document.getElementById("camera-feed") as HTMLVideoElement;
+const micActivationBtn = document.getElementById("mic-activation-btn") as HTMLButtonElement;
+const flowKicker = document.getElementById("flow-kicker") as HTMLElement;
+const flowTitle = document.getElementById("flow-title") as HTMLElement;
+const flowDescription = document.getElementById("flow-description") as HTMLElement;
+const flowPrimaryAction = document.getElementById("flow-primary-action") as HTMLButtonElement;
+const repeatGuidanceBtn = document.getElementById("repeat-guidance") as HTMLButtonElement;
+const currentLanguageLabel = document.getElementById("current-language-label") as HTMLElement;
+const languageStatus = document.getElementById("language-status") as HTMLElement;
+const venueFallbackForm = document.getElementById("venue-fallback-form") as HTMLFormElement;
+const manualVenueName = document.getElementById("manual-venue-name") as HTMLInputElement;
+const navAssist = document.getElementById("nav-assist") as HTMLButtonElement;
+const navContribute = document.getElementById("nav-contribute") as HTMLButtonElement;
+const assistView = document.getElementById("assist-view") as HTMLElement;
+const contributeView = document.getElementById("contribute-view") as HTMLElement;
 
 const tabLeaderboard = document.getElementById("tab-btn-leaderboard") as HTMLButtonElement;
 const tabContribute = document.getElementById("tab-btn-contribute") as HTMLButtonElement;
 const paneLeaderboard = document.getElementById("pane-leaderboard") as HTMLElement;
 const paneContribute = document.getElementById("pane-contribute") as HTMLElement;
+const leaderboardTbody = document.getElementById("leaderboard-tbody") as HTMLTableSectionElement;
+
+type JourneyStep = "language" | "permission" | "venue" | "menu" | "payment";
+
+const journeyOrder: JourneyStep[] = ["language", "permission", "venue", "menu", "payment"];
+const journeyStepLabels: Record<JourneyStep, string> = {
+  language: "1단계 · 언어 선택",
+  permission: "2단계 · 기기 권한",
+  venue: "3단계 · 매장 확인",
+  menu: "4단계 · 메뉴 탐색",
+  payment: "5단계 · 결제 안내"
+};
+
+function setJourneyStep(
+  step: JourneyStep,
+  title: string,
+  description: string,
+  actionLabel: string,
+  options: { showLanguage?: boolean; showVenueInput?: boolean } = {}
+) {
+  const activeIndex = journeyOrder.indexOf(step);
+  document.querySelectorAll<HTMLElement>("[data-journey-step]").forEach((item) => {
+    const itemStep = item.dataset.journeyStep as JourneyStep;
+    const itemIndex = journeyOrder.indexOf(itemStep);
+    item.classList.toggle("active", itemStep === step);
+    item.classList.toggle("complete", itemIndex < activeIndex);
+    if (itemStep === step) item.setAttribute("aria-current", "step");
+    else item.removeAttribute("aria-current");
+  });
+
+  flowKicker.textContent = journeyStepLabels[step];
+  flowTitle.textContent = title;
+  flowDescription.textContent = description;
+  flowPrimaryAction.textContent = actionLabel;
+  languageStatus.hidden = !options.showLanguage;
+  venueFallbackForm.hidden = !options.showVenueInput;
+}
+
+function showAppView(view: "assist" | "contribute") {
+  const showAssist = view === "assist";
+  assistView.hidden = !showAssist;
+  contributeView.hidden = showAssist;
+  navAssist.classList.toggle("active", showAssist);
+  navContribute.classList.toggle("active", !showAssist);
+  navAssist.setAttribute("aria-pressed", String(showAssist));
+  navContribute.setAttribute("aria-pressed", String(!showAssist));
+}
 // 다국어 딕셔너리 리소스 (Static Localization - 7개국어 확장)
 const locales: any = {
   ko: {
@@ -141,6 +207,85 @@ let isSelectingLanguage: boolean = false;
 let tempSelectedLang: string = "ko";
 let isVoiceTurningOffConfirm: boolean = false; // 음성 기능 해제 확인용 플래그
 
+// [추가] 배리어프리 권한 획득 성공여부 트래킹
+let isPermissionGranted: boolean = false;
+let onboardingState: "looping" | "confirming" | "completed" = "looping";
+let venueConfirmationPending: boolean = false;
+let isKioskNavigationActive: boolean = false;
+let pendingMenuConfirmation: boolean = false;
+let pendingVenueAnswer: string | null = null;
+let nearbyVenueCandidates: Array<{ id?: string; name: string; address?: string }> = [];
+
+const languageNames: Record<string, string> = {
+  ko: "한국어",
+  en: "English",
+  zh: "中文",
+  ja: "日本語",
+  ru: "Русский",
+  de: "Deutsch",
+  ar: "العربية"
+};
+
+// 다국어 권한 낭독 리소스
+const permissionLocales: any = {
+  ko: {
+    permissionNotice: "안내를 시작합니다. 카메라와 마이크 권한 사용을 위해 화면 상단 중앙 부근에 나타난 허용 버튼을 눌러주세요.",
+    requestPermissionText: "카메라 및 마이크 권한 요청 중...",
+    permissionSuccess: "권한 승인이 완료되었습니다. 주변 매장 탐색을 시작합니다.",
+    permissionSuccessSub: "권한 승인 완료",
+    permissionFail: "카메라 권한 획득 실패. 화면 인식을 위해 설정에서 카메라 권한을 승인해 주셔야 합니다.",
+    permissionFailSub: "권한 미승인 상태"
+  },
+  en: {
+    permissionNotice: "Starting guidance. To allow camera and microphone access, please click the Allow button near the top center of the screen.",
+    requestPermissionText: "Requesting camera & microphone permissions...",
+    permissionSuccess: "Permissions granted. Starting nearby restaurant search.",
+    permissionSuccessSub: "Permissions Granted",
+    permissionFail: "Camera permission denied. Please allow camera access in settings to scan kiosk screens.",
+    permissionFailSub: "Permissions Denied"
+  },
+  zh: {
+    permissionNotice: "开始向导。如需允许相机和麦克风权限，请点击屏幕上方中央附近的允许按钮。",
+    requestPermissionText: "正在请求相机和麦克风权限...",
+    permissionSuccess: "权限已批准。开始搜索附近的餐厅。",
+    permissionSuccessSub: "权限已批准",
+    permissionFail: "获取相机权限失败。请在设置中允许相机访问以扫描自助机屏幕。",
+    permissionFailSub: "权限未批准"
+  },
+  ja: {
+    permissionNotice: "案内を開始します。カメラとマイクの権限を許可するために、画面上部中央付近に表示される許可ボタンを押してください。",
+    requestPermissionText: "カメラとマイクの権限を要求中...",
+    permissionSuccess: "権限が承认されました。周辺の店舗検索を開始します。",
+    permissionSuccessSub: "権限承認完了",
+    permissionFail: "カメラ権限の取得に失敗しました。画面認識のため、設定からカメラの権限を許可してください。",
+    permissionFailSub: "権限未承認状態"
+  },
+  ru: {
+    permissionNotice: "Начинаем руководство. Чтобы разрешить доступ к камере и микрофону, нажмите кнопку Разрешить в верхней центральной части экрана.",
+    requestPermissionText: "Запрос разрешений для камеры и микрофона...",
+    permissionSuccess: "Разрешения предоставлены. Начинаем поиск ближайших заведений.",
+    permissionSuccessSub: "Разрешения предоставлены",
+    permissionFail: "Ошибка получения доступа к камере. Пожалуйста, включите доступ к камере в настройках.",
+    permissionFailSub: "Разрешения отклонены"
+  },
+  de: {
+    permissionNotice: "Anleitung wird gestartet. Um den Zugriff auf Kamera und Mikrofon zu erlauben, klicken Sie bitte auf die Schaltfläche Erlauben oben in der Mitte des Bildschirms.",
+    requestPermissionText: "Kamera- und Mikrofonberechtigungen werden angefordert...",
+    permissionSuccess: "Berechtigungen erteilt. Suche nach Restaurants in der Nähe wird gestartet.",
+    permissionSuccessSub: "Berechtigungen Erteilt",
+    permissionFail: "Kameraberechtigung verweigert. Bitte erlauben Sie den Kamerazugriff in den Einstellungen.",
+    permissionFailSub: "Berechtigungen Verweigert"
+  },
+  ar: {
+    permissionNotice: "بدء الإرشاد. للسماح بالوصول إلى الكاميرا والميكروفون، يرجى النقر فوق زر السماح بالقرب من أعلى وسط الشاشة.",
+    requestPermissionText: "جاري طلب أذونات الكاميرا والميكروفون...",
+    permissionSuccess: "تم منح الأذونات. بدء البحث عن المطاعم القريبة.",
+    permissionSuccessSub: "تم منح الأذونات",
+    permissionFail: "فشل الحصول على إذن الكاميرا. يرجى السماح بالوصول إلى الكاميرا في الإعدادات.",
+    permissionFailSub: "الأذونات مرفوضة"
+  }
+};
+
 // --------------------------------------------------
 // 1. Accessibility Onboarding & Speech Engine
 // --------------------------------------------------
@@ -153,12 +298,12 @@ function speak(text: string, onEndCallback?: () => void) {
   }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  
+
   // 현재 선택된 언어팩(userLang) 혹은 언어 선택 시의 임시 로케일에 맞춰 음성 매핑
-  const currentLocale = isSelectingLanguage 
-    ? langSelectorPrompts[tempSelectedLang].locale 
+  const currentLocale = isSelectingLanguage
+    ? langSelectorPrompts[tempSelectedLang].locale
     : (locales[userLang] ? langSelectorPrompts[userLang].locale : "ko-KR");
-    
+
   utterance.lang = currentLocale;
   utterance.rate = 1.0;
   if (onEndCallback) {
@@ -167,29 +312,93 @@ function speak(text: string, onEndCallback?: () => void) {
   window.speechSynthesis.speak(utterance);
 }
 
+function playAnswerCue(onComplete: () => void) {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  }
+
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+
+  const now = audioCtx.currentTime;
+  [660, 880].forEach((frequency, index) => {
+    const cue = audioCtx!.createOscillator();
+    const gain = audioCtx!.createGain();
+    const startAt = now + index * 0.22;
+    cue.frequency.value = frequency;
+    cue.type = "sine";
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.16, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.18);
+    cue.connect(gain);
+    gain.connect(audioCtx!.destination);
+    cue.start(startAt);
+    cue.stop(startAt + 0.2);
+  });
+
+  window.setTimeout(onComplete, 480);
+}
+
+function captureVenueAnswer() {
+  updateSubtitle("띵동 소리가 난 뒤 음식점 이름을 말씀해 주세요.");
+  playAnswerCue(() => {
+    updateSubtitle("지금 방문한 음식점 이름을 말씀해 주세요.");
+    hapticInstructionText.textContent = "매장 이름을 듣고 있습니다.";
+    startSpeechRecognition((answer) => {
+      pendingVenueAnswer = answer.trim();
+      const reviewMessage = `${pendingVenueAnswer}로 들었습니다. 제출하려면 화면을 톡톡 두 번 두드리세요.`;
+      speak(reviewMessage);
+      updateSubtitle(reviewMessage);
+      hapticInstructionText.textContent = "답변을 제출하려면 화면을 두 번 탭하세요. 다시 말하려면 안내 다시 듣기를 누르세요.";
+      setJourneyStep(
+        "venue",
+        `${pendingVenueAnswer}로 들었습니다`,
+        "답변이 맞으면 화면을 두 번 탭해 제출하세요.",
+        "이 답변 제출",
+        { showVenueInput: true }
+      );
+    });
+  });
+}
+
 // 최초 진입 시 음성 온보딩 실행
 window.addEventListener("DOMContentLoaded", () => {
   loadLeaderboard();
-  
+
   // 브라우저 로컬 저장소 확인
   const savedLang = localStorage.getItem("user_language");
   if (savedLang && locales[savedLang]) {
     // 이미 언어가 영구 저장된 경우: 순차 낭독 생략하고 즉시 해당 다국어로 기동
     userLang = savedLang;
     t = locales[userLang];
-    speak(t.welcome);
-    updateSubtitle(t.welcome);
+
+    // 시작하기 위해 더블탭 유도
+    const welcomeMsg = t.welcome;
+    speak(welcomeMsg);
+    updateSubtitle(welcomeMsg);
+    onboardingState = "completed";
+    currentLanguageLabel.textContent = languageNames[userLang];
+    hapticInstructionText.textContent = "기기 권한 안내를 시작하려면 화면을 두 번 탭하세요.";
+    setJourneyStep(
+      "permission",
+      "카메라와 마이크를 준비합니다",
+      "화면을 두 번 탭하면 권한 요청과 음성 안내가 함께 시작됩니다.",
+      "카메라·마이크 허용하기"
+    );
   } else {
-    // 저장된 언어가 없는 경우: 7개국어 순차 최초 웰컴 가이드 낭독 (외국인 시각장애인 인지 장벽 제거)
-    const startNotice = "반갑습니다. 화면을 두 번 탭하여 언어 설정을 시작하세요. " +
-                        "Welcome. Double tap to start language selection. " +
-                        "欢迎。双击屏幕开始选择语言。 " +
-                        "ようこそ。ダブルタップして言語選択を開始します。 " +
-                        "Добро пожаловать. Дважды коснитесь для выбора языка. " +
-                        "Willkommen. Doppeltippen, um die Sprachauswahl zu starten. " +
-                        "مرحبًا. انقر نقرًا مزدوجًا لبدء اختيار اللغة.";
-    speak(startNotice);
-    updateSubtitle(startNotice);
+    // 저장된 언어가 없는 경우: 즉시 7개국어 순차 최초 웰컴 가이드 낭독 루프 가동 (외국인 인지 장벽 원천 제거)
+    isSelectingLanguage = true;
+    onboardingState = "looping";
+    currentSelectionIndex = 0;
+    setJourneyStep(
+      "language",
+      "안내 언어를 듣고 있습니다",
+      "원하는 언어가 들리면 화면을 두 번 탭하거나 아래 버튼을 누르세요.",
+      "현재 언어 선택",
+      { showLanguage: true }
+    );
+    runLanguageSelectionLoop();
   }
 
   // 온보딩 더블탭 및 롱프레스 제스처 바인딩
@@ -200,6 +409,39 @@ window.addEventListener("DOMContentLoaded", () => {
     pressTimer = window.setTimeout(handleTouchpadLongPress, 2000);
   });
   zeroUiTouchpad.addEventListener("mouseup", () => clearTimeout(pressTimer));
+  zeroUiTouchpad.addEventListener("mouseleave", () => clearTimeout(pressTimer));
+  zeroUiTouchpad.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleTouchpadDoubleTap();
+    }
+  });
+
+  flowPrimaryAction.addEventListener("click", handleTouchpadDoubleTap);
+  micActivationBtn.addEventListener("click", handleTouchpadDoubleTap);
+  repeatGuidanceBtn.addEventListener("click", () => {
+    if (pendingVenueAnswer) {
+      pendingVenueAnswer = null;
+      speak("띵동 소리가 들리면 음식점 이름을 다시 대답해 주세요.", captureVenueAnswer);
+      return;
+    }
+    const guidance = subtitleBox.textContent?.trim();
+    if (guidance) speak(guidance);
+  });
+
+  venueFallbackForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const venueName = manualVenueName.value.trim();
+    if (!venueName) {
+      updateSubtitle("매장 이름을 입력한 뒤 매장 찾기를 눌러주세요.");
+      manualVenueName.focus();
+      return;
+    }
+    handleVenueIdentification(venueName);
+  });
+
+  navAssist.addEventListener("click", () => showAppView("assist"));
+  navContribute.addEventListener("click", () => showAppView("contribute"));
 });
 
 let isPermissionRequested = false;
@@ -216,39 +458,85 @@ function initAccessibilityPermissions() {
     audioCtx.resume();
   }
 
+  const pLocale = permissionLocales[userLang] || permissionLocales["en"];
+
   // 2. 카메라/마이크 권한 요청 트리거 및 시각장애인용 음성 안내 코칭
-  const permissionNotice = "안내를 시작합니다. 카메라와 마이크 권한 사용을 위해 화면 상단 중앙 부근에 나타난 허용 버튼을 눌러주세요.";
+  const permissionNotice = pLocale.permissionNotice;
   speak(permissionNotice);
-  updateSubtitle("🔒 카메라 및 마이크 권한 요청 중...");
+  updateSubtitle("🔒 " + pLocale.requestPermissionText);
+  hapticInstructionText.textContent = "브라우저 상단의 허용 버튼을 눌러 카메라와 마이크를 연결하세요.";
+  setJourneyStep(
+    "permission",
+    "브라우저 권한을 확인하세요",
+    "카메라는 키오스크 화면을 읽고, 마이크는 매장과 메뉴 이름을 듣는 데 사용합니다.",
+    "권한 요청 중…"
+  );
+  flowPrimaryAction.disabled = true;
 
   // 화면 테두리를 황색/녹색 번쩍임으로 점멸하여 가시성 유도
-  triggerVisualHapticFlash();
+  triggerVisualHapticFlash("center");
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    isPermissionRequested = false;
+    flowPrimaryAction.disabled = false;
+    updateSubtitle("이 브라우저에서는 카메라를 사용할 수 없습니다. 보안 연결인지 확인하거나 다른 브라우저에서 다시 시도하세요.");
+    setJourneyStep(
+      "permission",
+      "카메라를 연결할 수 없습니다",
+      "보안 연결을 확인하거나 카메라를 지원하는 브라우저에서 다시 시도하세요.",
+      "권한 다시 시도"
+    );
+    return;
+  }
 
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: true })
-    .then((stream) => {
+    .then(async (stream) => {
       console.log("📹 카메라/마이크 권한 승인 완료");
-      speak("권한 승인이 완료되었습니다. 주문 여정을 시작합니다.");
-      stream.getTracks().forEach(track => track.stop()); // 자원 해제
+      isPermissionGranted = true;
+      cameraStream = stream;
+      cameraFeed.srcObject = stream;
+      void cameraFeed.play().catch(() => undefined);
+
+      const successNotice = pLocale.permissionSuccess;
+      flowPrimaryAction.disabled = false;
+      setJourneyStep(
+        "venue",
+        "주변 매장을 찾습니다",
+        "현재 위치에서 가까운 매장을 불러온 뒤 이름을 음성으로 확인합니다.",
+        "매장 검색 다시 시작",
+        { showVenueInput: true }
+      );
+      speak(successNotice, () => {
+        // [중요] 권한 획득 성공 즉시 다음 단계인 GPS 기반 매장 매칭으로 오토-플레이 진입! (불필요 탭 요구 차단)
+        startVenueIdentificationSequence();
+      });
+      updateSubtitle("✅ " + pLocale.permissionSuccessSub);
     })
     .catch((err) => {
       console.error("❌ 권한 획득 오류:", err);
-      speak("카메라 권한 획득 실패. 화면 인식을 위해 설정에서 카메라 권한을 승인해 주셔야 합니다.");
-      updateSubtitle("⚠️ 권한 미승인 상태");
+      isPermissionRequested = false;
+      flowPrimaryAction.disabled = false;
+      speak(pLocale.permissionFail);
+      updateSubtitle("⚠️ " + pLocale.permissionFailSub);
+      hapticInstructionText.textContent = "브라우저 설정에서 카메라와 마이크를 허용한 뒤 다시 시도하세요.";
+      setJourneyStep(
+        "permission",
+        "권한이 필요합니다",
+        "브라우저 설정에서 카메라와 마이크를 허용한 뒤 다시 시도하세요.",
+        "권한 다시 시도"
+      );
     });
 }
 
 // 더블탭 액션 핸들러 (상태 머신 분기)
 function handleTouchpadDoubleTap() {
-  // 최초 더블탭 시 브라우저 오디오 및 비전 하드웨어 권한 획득 온보딩 즉각 트리거
-  initAccessibilityPermissions();
-
   // 0. 음성 기능 끄기 이중 확인 중인 경우 ➔ 더블탭 시 음성 가이드 종료 확정
   if (isVoiceTurningOffConfirm) {
     isVoiceTurningOffConfirm = false;
     isVoiceMode = false;
     toggleVoiceOn.checked = false;
-    
-    const offMsg = t.turnOffSuccess || locales[userLang].turnOffSuccess;
+
+    const offMsg = "음성 안내를 껐습니다. 화면의 자막 안내는 계속 표시됩니다.";
     updateSubtitle(offMsg);
     speak(offMsg, () => {
       window.speechSynthesis.cancel();
@@ -257,43 +545,168 @@ function handleTouchpadDoubleTap() {
     return;
   }
 
+  if (venueConfirmationPending) {
+    venueConfirmationPending = false;
+    startKioskNavigation();
+    return;
+  }
+
+  if (pendingVenueAnswer) {
+    const answer = pendingVenueAnswer;
+    pendingVenueAnswer = null;
+    handleVenueIdentification(answer);
+    return;
+  }
+
+  if (isKioskNavigationActive) {
+    isKioskNavigationActive = false;
+    kioskArrivalOnboarding();
+    return;
+  }
+
+  if (isPauseMode) {
+    isPauseMode = false;
+    isFreezed = false;
+    startAudioSteering();
+    const resumeMessage = "안내를 다시 시작합니다.";
+    speak(resumeMessage);
+    updateSubtitle(resumeMessage);
+    hapticInstructionText.textContent = "한 손가락은 방향 안내, 두 손가락은 메뉴 탐색에 사용하세요.";
+    return;
+  }
+
+  if (isFreezed && currentVenueData) {
+    handleVirtualExplorationQuery();
+    return;
+  }
+
+  if (pendingMenuConfirmation && targetMenuItem) {
+    pendingMenuConfirmation = false;
+    addToCart(targetMenuItem);
+    currentKioskState = "cart_confirm";
+    renderKioskScreen();
+    const cartMessage = `${targetMenuItem.name}을 장바구니에 담았습니다. 결제로 이동하려면 아래 버튼을 누르세요.`;
+    speak(cartMessage);
+    updateSubtitle(cartMessage);
+    hapticInstructionText.textContent = "결제로 이동하거나 세 손가락으로 이전 단계로 돌아갈 수 있습니다.";
+    setJourneyStep(
+      "menu",
+      "장바구니에 담았습니다",
+      `${targetMenuItem.name}, ${targetMenuItem.price}원`,
+      "결제로 이동"
+    );
+    return;
+  }
+
+  if (currentKioskState === "menu" && currentVenueData) {
+    const menuPrompt = "원하는 메뉴 이름을 말씀해 주세요.";
+    speak(menuPrompt, () => {
+      startSpeechRecognition((query) => {
+        const item = currentVenueData.menu.find((candidate: any) =>
+          query.includes(candidate.name) || candidate.name.includes(query)
+        );
+        if (!item) {
+          updateSubtitle("해당 메뉴를 찾지 못했습니다. 다른 이름으로 다시 말해 주세요.");
+          return;
+        }
+        targetMenuItem = item;
+        selectedCategory = item.category;
+        pendingMenuConfirmation = true;
+        renderKioskScreen();
+        const targetMessage = `${item.name}, 가격은 ${item.price}원입니다. 장바구니에 담으려면 아래 버튼을 누르거나 한 손가락으로 방향음을 따라 이동하세요.`;
+        speak(targetMessage);
+        updateSubtitle(targetMessage);
+        hapticInstructionText.textContent = "버튼으로 담거나 한 손가락으로 실제 키오스크의 목표 위치를 찾으세요.";
+        setJourneyStep(
+          "menu",
+          item.name,
+          `${item.description || "선택한 메뉴"} · ${item.price}원`,
+          "이 메뉴 담기"
+        );
+      });
+    });
+    updateSubtitle(menuPrompt);
+    return;
+  }
+
+  if (currentKioskState === "cart_confirm") {
+    window.checkoutCart();
+    return;
+  }
+
+  if (currentKioskState === "pay_select") {
+    window.insertCardMock();
+    return;
+  }
+
+  if (currentKioskState === "done") {
+    window.resetKiosk();
+    startVenueIdentificationSequence();
+    return;
+  }
+
   const savedLang = localStorage.getItem("user_language");
-  
+
   // 1. 아직 언어가 미설정된 대기 상태인 경우 ➔ 순차 언어 낭독 루프 개시
   if (!savedLang && !isSelectingLanguage) {
     isSelectingLanguage = true;
+    onboardingState = "looping";
     currentSelectionIndex = 0;
     runLanguageSelectionLoop();
     return;
   }
 
   // 2. 순차 언어 낭독 중에 탭이 들어온 경우 ➔ 해당 언어 임시 락인 및 "저장할까요?" 컨펌 단계 진입
-  if (isSelectingLanguage && !languageLoopTimeout) {
-    // 컨펌 단계에서 더블 탭이 들어오면 ➔ 영구 저장 및 주문 0단계 시작
-    localStorage.setItem("user_language", tempSelectedLang);
-    userLang = tempSelectedLang;
-    t = locales[userLang];
-    isSelectingLanguage = false;
-    
-    startVenueIdentificationSequence();
-    return;
-  }
+  if (isSelectingLanguage && onboardingState === "looping") {
+    onboardingState = "confirming";
+    if (languageLoopTimeout) {
+      clearTimeout(languageLoopTimeout);
+      languageLoopTimeout = null;
+    }
 
-  if (isSelectingLanguage && languageLoopTimeout) {
-    // 낭독 중에 더블 탭이 들어오면 루프 일시 정지하고 컨펌 진행
-    clearTimeout(languageLoopTimeout);
-    languageLoopTimeout = null;
-    
     // 임시 락인 상태에서 컨펌 메시지 재생
     const confirmPrompt = locales[tempSelectedLang].saveConfirm;
     speak(confirmPrompt);
     updateSubtitle(confirmPrompt);
+    hapticInstructionText.textContent = "이 언어를 저장하려면 다시 두 번 탭하세요. 다른 언어를 들으려면 길게 누르세요.";
+    setJourneyStep(
+      "language",
+      `${languageNames[tempSelectedLang]}를 선택했습니다`,
+      "이 언어를 기본 안내 언어로 저장할까요?",
+      "이 언어로 계속",
+      { showLanguage: true }
+    );
     return;
   }
 
-  // 3. 언어 세팅 완료 후의 일반적인 주문 더블탭 ➔ GPS 기반 주변 매장 추천 및 AI 특정 시퀀스 시작
+  // 3. 임시 락인 상태에서 수락 더블 탭 ➔ 영구 저장 및 권한 획득 온보딩 시작
+  if (isSelectingLanguage && onboardingState === "confirming") {
+    localStorage.setItem("user_language", tempSelectedLang);
+    userLang = tempSelectedLang;
+    t = locales[userLang];
+    isSelectingLanguage = false;
+    onboardingState = "completed";
+    currentLanguageLabel.textContent = languageNames[userLang];
+    hapticInstructionText.textContent = "브라우저 권한 안내를 시작합니다.";
+    setJourneyStep(
+      "permission",
+      "카메라와 마이크를 준비합니다",
+      "권한 요청이 열리면 브라우저 상단의 허용 버튼을 눌러주세요.",
+      "카메라·마이크 허용하기"
+    );
+
+    // 최종 확인 즉시 Audio 및 비전 권한 획득 플로우 시동!
+    initAccessibilityPermissions();
+    return;
+  }
+
+  // 4. 언어 세팅 완료 후의 일반적인 주문 더블탭
   if (savedLang) {
-    startVenueIdentificationSequence();
+    if (!isPermissionGranted) {
+      initAccessibilityPermissions();
+    } else {
+      startVenueIdentificationSequence();
+    }
   }
 }
 
@@ -302,15 +715,38 @@ function handleTouchpadLongPress() {
   // 0. 음성 기능 끄기 이중 확인 중인 경우 ➔ 롱프레스 시 끄기 취소 (음성 유지)
   if (isVoiceTurningOffConfirm) {
     isVoiceTurningOffConfirm = false;
-    const keepMsg = t.turnOnMsg || locales[userLang].turnOnMsg;
+    const keepMsg = "음성 안내를 계속 사용합니다.";
     speak(keepMsg);
     updateSubtitle(keepMsg);
     return;
   }
 
+  if (venueConfirmationPending) {
+    venueConfirmationPending = false;
+    updateSubtitle("매장 확인을 취소했습니다. 매장 이름을 다시 말하거나 직접 입력해 주세요.");
+    setJourneyStep(
+      "venue",
+      "매장을 다시 확인합니다",
+      "매장 이름을 말하거나 아래 입력란에 직접 입력하세요.",
+      "음성으로 매장 말하기",
+      { showVenueInput: true }
+    );
+    startVenueIdentificationSequence();
+    return;
+  }
+
   // 1. 언어 선택 컨펌 단계에서 롱프레스 ➔ 임시 락인 취소하고 순차 낭독 루프 재개
-  if (isSelectingLanguage && !languageLoopTimeout) {
+  if (isSelectingLanguage && onboardingState === "confirming") {
+    onboardingState = "looping";
     currentSelectionIndex = (langList.indexOf(tempSelectedLang) + 1) % langList.length;
+    hapticInstructionText.textContent = "다음 언어를 듣고 있습니다. 원하는 언어에서 두 번 탭하세요.";
+    setJourneyStep(
+      "language",
+      "다음 안내 언어를 듣습니다",
+      "원하는 언어가 들리면 화면을 두 번 탭하거나 아래 버튼을 누르세요.",
+      "현재 언어 선택",
+      { showLanguage: true }
+    );
     speak("Cancelled.", () => {
       runLanguageSelectionLoop();
     });
@@ -322,30 +758,39 @@ function handleTouchpadLongPress() {
   toggleVoiceOn.checked = false;
   window.speechSynthesis.cancel();
   updateSubtitle(t.onboardingText);
-  hapticInstructionText.innerHTML = "자막 모드 작동 중. 화면의 텍스트 안내를 따라 키오스크를 터치하세요.";
-  initVenue("starbucks");
+  hapticInstructionText.textContent = "자막 안내를 사용합니다. 아래 단계 실행 버튼으로 계속할 수 있습니다.";
+  setJourneyStep(
+    isPermissionGranted ? "venue" : "permission",
+    "자막 안내를 사용합니다",
+    "음성 없이도 현재 안내와 단계 실행 버튼으로 주문을 이어갈 수 있습니다.",
+    isPermissionGranted ? "주변 매장 찾기" : "카메라·마이크 허용하기",
+    { showVenueInput: isPermissionGranted }
+  );
 }
 
 // 순차 언어 낭독 루프 코어
 function runLanguageSelectionLoop() {
-  if (!isSelectingLanguage) return;
+  if (!isSelectingLanguage || onboardingState !== "looping") return;
 
   const currentLang = langList[currentSelectionIndex];
   tempSelectedLang = currentLang;
   const prompt = langSelectorPrompts[currentLang];
 
+  currentLanguageLabel.textContent = languageNames[currentLang];
   updateSubtitle(prompt.text);
-  
+
   // 해당 국가의 언어 발음(locale)으로 질문 낭독
   speak(prompt.text, () => {
     // 낭독 완료 후 3.5초간 사용자의 더블탭 입력을 대기함
-    languageLoopTimeout = setTimeout(() => {
-      if (isSelectingLanguage) {
-        // 더블탭이 없었으면 다음 언어로 인덱스 변환하여 루프 재귀 호출
-        currentSelectionIndex = (currentSelectionIndex + 1) % langList.length;
-        runLanguageSelectionLoop();
-      }
-    }, 3500);
+    if (onboardingState === "looping") {
+      languageLoopTimeout = setTimeout(() => {
+        if (isSelectingLanguage && onboardingState === "looping") {
+          // 더블탭이 없었으면 다음 언어로 인덱스 변환하여 루프 재귀 호출
+          currentSelectionIndex = (currentSelectionIndex + 1) % langList.length;
+          runLanguageSelectionLoop();
+        }
+      }, 3500);
+    }
   });
 }
 
@@ -355,14 +800,14 @@ toggleVoiceOn.addEventListener("change", (e: any) => {
     // 억지로 토글을 다시 ON으로 되돌리고 음성으로 끄기 여부 재차 확인
     toggleVoiceOn.checked = true;
     isVoiceTurningOffConfirm = true;
-    
-    const confirmPrompt = t.turnOffConfirm || locales[userLang].turnOffConfirm;
+
+    const confirmPrompt = "음성 안내를 끌까요? 끄려면 화면을 두 번 탭하고, 계속 사용하려면 길게 누르세요.";
     speak(confirmPrompt);
     updateSubtitle(confirmPrompt);
   } else {
     // 켤 때는 바로 켜짐
     isVoiceMode = true;
-    const activePrompt = t.turnOnMsg || locales[userLang].turnOnMsg;
+    const activePrompt = "음성 안내가 켜졌습니다.";
     speak(activePrompt);
     updateSubtitle(activePrompt);
     startAudioSteering();
@@ -378,11 +823,13 @@ function updateSubtitle(text: string) {
 function startSpeechRecognition(onResultCallback: (text: string) => void) {
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    updateSubtitle("⚠️ 브라우저가 음성 인식을 지원하지 않습니다.");
+    updateSubtitle("이 브라우저는 음성 인식을 지원하지 않습니다. 매장 이름을 직접 입력해 주세요.");
+    venueFallbackForm.hidden = false;
+    manualVenueName.focus();
     return;
   }
   const recognition = new SpeechRecognition();
-  recognition.lang = "ko-KR";
+  recognition.lang = langSelectorPrompts[userLang]?.locale || "ko-KR";
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
@@ -402,19 +849,33 @@ function startSpeechRecognition(onResultCallback: (text: string) => void) {
 
   recognition.onerror = () => {
     micWaveEffect.classList.remove("listening");
-    speak("잘 듣지 못했습니다. 화면을 더블 탭하고 다시 말씀해 주세요.");
+    const retryMessage = "잘 듣지 못했습니다. 다시 말하거나 매장 이름을 직접 입력해 주세요.";
+    speak(retryMessage);
+    updateSubtitle(retryMessage);
+    venueFallbackForm.hidden = false;
   };
 }
 
 // 주변 매장 자동 GPS 스캔 및 AI 음성 브리핑 개시
 function startVenueIdentificationSequence() {
-  updateSubtitle("📍 내 주변 매장 스캔 중...");
-  
+  venueConfirmationPending = false;
+  pendingVenueAnswer = null;
+  const scanningMessage = "내 주변 매장을 찾고 있습니다…";
+  updateSubtitle(scanningMessage);
+  hapticInstructionText.textContent = "주변 매장을 불러온 뒤 매장 이름을 말씀해 주세요.";
+  setJourneyStep(
+    "venue",
+    "주변 매장을 찾고 있습니다",
+    "위치 사용이 어렵거나 음성 인식이 되지 않으면 매장 이름을 직접 입력하세요.",
+    "주변 매장 다시 찾기",
+    { showVenueInput: true }
+  );
+
   if ("geolocation" in navigator) {
     navigator.geolocation.getCurrentPosition(async (position) => {
       const lat = position.coords.latitude;
       const lng = position.coords.longitude;
-      
+
       try {
         const response = await fetch("/api/venue-assist", {
           method: "POST",
@@ -422,11 +883,10 @@ function startVenueIdentificationSequence() {
           body: JSON.stringify({ gps: { lat, lng } })
         });
         const resData = await response.json();
-        
-        speak(resData.audioPrompt, () => {
-          startSpeechRecognition(handleVenueIdentification);
-        });
-        updateSubtitle(resData.audioPrompt);
+        nearbyVenueCandidates = Array.isArray(resData.venues) ? resData.venues : [];
+        const promptWithAnswerGuide = `${resData.audioPrompt} 이어서 띵동 소리가 들리면 대답해 주세요.`;
+        speak(promptWithAnswerGuide, captureVenueAnswer);
+        updateSubtitle(promptWithAnswerGuide);
       } catch (err) {
         fallbackVenueIdentificationPrompt();
       }
@@ -440,16 +900,29 @@ function startVenueIdentificationSequence() {
 
 function fallbackVenueIdentificationPrompt() {
   const defaultPrompt = "주변 매장 정보를 불러올 수 없습니다. 지금 방문하신 음식점의 이름을 말씀해 주세요.";
-  speak(defaultPrompt, () => {
-    startSpeechRecognition(handleVenueIdentification);
-  });
+  nearbyVenueCandidates = [];
+  speak(`${defaultPrompt} 이어서 띵동 소리가 들리면 대답해 주세요.`, captureVenueAnswer);
   updateSubtitle(defaultPrompt);
+  setJourneyStep(
+    "venue",
+    "매장 이름을 알려주세요",
+    "음성으로 말하거나 아래 입력란에 매장 이름을 직접 입력하세요.",
+    "음성으로 매장 말하기",
+    { showVenueInput: true }
+  );
 }
 
 // 온보딩 0단계: 매장명 식별 핸들러
 async function handleVenueIdentification(venueName: string) {
   updateSubtitle(`검색한 매장: "${venueName}"`);
   speak(`${venueName} 매장 데이터를 조회하고 있습니다.`);
+  setJourneyStep(
+    "venue",
+    "매장 정보를 확인하고 있습니다",
+    `${venueName}의 키오스크 데이터를 불러옵니다.`,
+    "확인 중…"
+  );
+  flowPrimaryAction.disabled = true;
 
   // 스마트폰 GPS 획득 시도 (있을 경우 전송)
   let lat = 37.5665;
@@ -465,28 +938,53 @@ async function handleVenueIdentification(venueName: string) {
     const response = await fetch("/api/venue", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: venueName, gps: { lat, lng } })
+      body: JSON.stringify({ name: venueName, gps: { lat, lng }, nearbyVenues: nearbyVenueCandidates })
     });
     const resData = await response.json();
 
     if (resData.error) {
       speak("등록된 매장을 찾을 수 없습니다. 다시 매장명을 말씀해 주세요.");
+      flowPrimaryAction.disabled = false;
+      setJourneyStep(
+        "venue",
+        "매장을 찾지 못했습니다",
+        "매장 이름이나 지점명을 바꿔 다시 검색하세요.",
+        "다시 말하기",
+        { showVenueInput: true }
+      );
       return;
     }
 
     currentVenueKey = resData.venueKey;
     currentVenueData = resData.data;
     kioskStoreName.textContent = currentVenueData.name;
-    
-    const confirmedText = `${currentVenueData.name}에 도착하신 것이 맞습니까? 맞으면 더블 탭, 아니면 화면을 길게 눌러 다시 말해주세요.`;
-    speak(confirmedText, () => {
-      startKioskNavigation();
-    });
+
+    venueConfirmationPending = true;
+    flowPrimaryAction.disabled = false;
+    const confirmedText = `${currentVenueData.name}에 도착하신 것이 맞습니까? 맞으면 두 번 탭하고, 아니면 화면을 길게 눌러 다시 말해 주세요.`;
+    speak(confirmedText);
     updateSubtitle(confirmedText);
+    hapticInstructionText.textContent = "매장이 맞으면 두 번 탭하세요. 아니면 길게 눌러 다시 찾으세요.";
+    setJourneyStep(
+      "venue",
+      currentVenueData.name,
+      "현재 매장이 맞는지 확인해 주세요.",
+      "이 매장이 맞습니다",
+      { showVenueInput: true }
+    );
 
   } catch (error) {
-    speak("서버 통신 실패. 기본 매장 데이터로 주문을 기동합니다.");
-    initVenue("starbucks");
+    flowPrimaryAction.disabled = false;
+    const errorMessage = "매장 정보를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 시도하세요.";
+    speak(errorMessage);
+    updateSubtitle(errorMessage);
+    setJourneyStep(
+      "venue",
+      "매장 정보를 불러오지 못했습니다",
+      "네트워크를 확인한 뒤 다시 검색하거나 매장 이름을 직접 입력하세요.",
+      "다시 시도",
+      { showVenueInput: true }
+    );
   }
 }
 
@@ -494,12 +992,20 @@ async function handleVenueIdentification(venueName: string) {
 // 2. Indoor Kiosk Finder (1단계: 매장 내 기기 탐색)
 // --------------------------------------------------
 function startKioskNavigation() {
+  isKioskNavigationActive = true;
   speak("1단계. 매장 내 키오스크 탐색을 시작합니다. 휴대폰 후면 카메라를 정면을 향해 들고 천천히 걸어가세요.", () => {
     startAudioSteering();
     if (streamInterval) clearInterval(streamInterval);
     streamInterval = setInterval(sendVideoFrameToServer, 1000);
   });
   updateSubtitle("1단계: 매장 내 키오스크 위치 탐색 중. 폰을 정면으로 들어 비추며 걸어가세요.");
+  hapticInstructionText.textContent = "키오스크 앞에 도착하면 화면을 두 번 탭하세요.";
+  setJourneyStep(
+    "menu",
+    "키오스크를 찾고 있습니다",
+    "휴대폰 후면 카메라를 정면으로 들고 천천히 이동하세요.",
+    "키오스크 앞에 도착했습니다"
+  );
 }
 
 // --------------------------------------------------
@@ -517,10 +1023,10 @@ function startAudioSteering() {
   if (beepInterval) clearInterval(beepInterval);
   beepInterval = setInterval(() => {
     if (!audioCtx || isFreezed || !pannerNode) return;
-    
+
     oscillator = audioCtx.createOscillator();
     oscillator.type = "sine";
-    
+
     if (compassLabelText.textContent && compassLabelText.textContent.includes("위로")) {
       oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
     } else if (compassLabelText.textContent && compassLabelText.textContent.includes("아래로")) {
@@ -602,11 +1108,11 @@ function hapticSteer(pattern: string) {
 // iOS 진동 미지원 대응용 비주얼 햅틱 플래시 헬퍼
 function triggerVisualHapticFlash(pattern: string) {
   zeroUiTouchpad.className = "zero-ui-touchpad"; // 클래스 리셋 (기존 스타일 유지)
-  
+
   // 리팩토링된 햅틱 클래스 매핑
   const flashClass = `haptic-pulse-${pattern}`;
   zeroUiTouchpad.classList.add(flashClass);
-  
+
   // 펄스 애니메이션이 끝난 후 원복
   const delay = pattern === "center" ? 1000 : (pattern === "left" || pattern === "right" ? 500 : 200);
   setTimeout(() => {
@@ -635,11 +1141,15 @@ function initVenue(key: string) {
 btnStarbucks.addEventListener("click", () => {
   btnStarbucks.classList.add("active");
   btnMcdonalds.classList.remove("active");
+  btnStarbucks.setAttribute("aria-pressed", "true");
+  btnMcdonalds.setAttribute("aria-pressed", "false");
   initVenue("starbucks");
 });
 btnMcdonalds.addEventListener("click", () => {
   btnMcdonalds.classList.add("active");
   btnStarbucks.classList.remove("active");
+  btnMcdonalds.setAttribute("aria-pressed", "true");
+  btnStarbucks.setAttribute("aria-pressed", "false");
   initVenue("mcdonalds");
 });
 
@@ -652,6 +1162,13 @@ document.addEventListener("click", (e: any) => {
 function kioskArrivalOnboarding() {
   currentKioskState = "menu";
   renderKioskScreen();
+  setJourneyStep(
+    "menu",
+    "키오스크 앞에 도착했습니다",
+    "바로 주문하거나 메뉴판을 음성으로 천천히 탐색할 수 있습니다.",
+    "원하는 메뉴 말하기"
+  );
+  hapticInstructionText.textContent = "메뉴 이름을 말하려면 두 번 탭하세요. 두 손가락으로 화면을 훑어 메뉴를 들을 수도 있습니다.";
 
   const arrivalText = "키오스크 앞에 도착했습니다. 바로 주문하시겠습니까, 아니면 메뉴판 전체를 스캔하여 찬찬히 고민해 보시겠습니까? 바로 주문은 1번, 찬찬히 고민은 2번이라고 말해 주세요.";
   speak(arrivalText, () => {
@@ -673,8 +1190,12 @@ function triggerSitDownExploration() {
   const sitDownText = "메뉴판 동기화가 완료되었습니다. 대기 줄의 눈치를 피할 수 있도록 테이블(제자리)로 편안하게 복귀하여 탐색해 주십시오. 화면을 더블 탭하고 버거 메뉴를 보여달라고 요구하세요.";
   speak(sitDownText);
   updateSubtitle(sitDownText);
-
-  zeroUiTouchpad.addEventListener("dblclick", handleVirtualExplorationQuery);
+  setJourneyStep(
+    "menu",
+    "전체 메뉴 탐색 모드",
+    "편한 자리에서 메뉴 이름을 말해 가격과 설명을 들을 수 있습니다.",
+    "메뉴 이름 말하기"
+  );
 }
 
 function handleVirtualExplorationQuery() {
@@ -718,15 +1239,15 @@ function renderKioskScreen() {
     container.innerHTML = `
       <div class="kiosk-step" id="kiosk-step-start">
         <div class="kiosk-start-hero">
-          <div class="start-logo">🟢</div>
+          <div class="start-logo" aria-hidden="true"></div>
           <h2>반갑습니다. ${currentVenueData.name}입니다.</h2>
           <p>주문을 시작하려면 화면 하단의 버튼을 눌러주세요.</p>
           <button class="kiosk-big-action-btn" id="kiosk-start-btn">주문하기 (Start Order)</button>
         </div>
       </div>`;
     cardSlotMock.querySelector(".slot-light")?.classList.remove("pulsing");
-  } 
-  
+  }
+
   else if (currentKioskState === "menu") {
     let navHTML = `<div class="kiosk-nav-tabs">`;
     currentVenueData.categories.forEach((cat: string) => {
@@ -740,10 +1261,10 @@ function renderKioskScreen() {
     filteredMenu.forEach((item: any) => {
       const isTarget = targetMenuItem && targetMenuItem.id === item.id ? "selected-highlight" : "";
       gridHTML += `
-        <div class="kiosk-menu-card ${isTarget}" onclick="selectMenuItem('${item.id}')">
+        <button type="button" class="kiosk-menu-card ${isTarget}" onclick="selectMenuItem('${item.id}')">
           <div class="card-title">${item.name}</div>
           <div class="card-price">${item.price}원</div>
-        </div>`;
+        </button>`;
     });
     gridHTML += `</div>`;
 
@@ -765,8 +1286,8 @@ function renderKioskScreen() {
     if (!item) return;
     container.innerHTML = `
       <div class="kiosk-popup-overlay">
-        <div class="kiosk-popup">
-          <h3>${item.name} 옵션 선택</h3>
+        <div class="kiosk-popup" role="dialog" aria-modal="true" aria-labelledby="kiosk-popup-title">
+          <h3 id="kiosk-popup-title">${item.name} 옵션 선택</h3>
           <div class="option-group">
             <div class="option-title">선택형 상세 옵션</div>
             <div class="option-choices">
@@ -802,14 +1323,14 @@ function renderKioskScreen() {
       <div class="kiosk-step kiosk-payment-screen">
         <h2 style="font-weight:800; color:#1e293b;">💳 결제 수단 선택</h2>
         <div class="payment-methods-grid">
-          <div class="payment-card-btn active-highlight" onclick="insertCardMock()">
+          <button type="button" class="payment-card-btn active-highlight" onclick="insertCardMock()">
             <span style="font-size:2.5rem;">💳</span>
             <span>신용카드 결제</span>
-          </div>
-          <div class="payment-card-btn">
+          </button>
+          <button type="button" class="payment-card-btn">
             <span style="font-size:2.5rem;">📱</span>
             <span>모바일 바코드 페이</span>
-          </div>
+          </button>
         </div>
         <p style="color:#64748b; font-size:0.85rem; font-weight:700;">실물 카드를 아래 슬롯에 꽂아 주세요.</p>
       </div>`;
@@ -819,7 +1340,7 @@ function renderKioskScreen() {
   else if (currentKioskState === "done") {
     container.innerHTML = `
       <div class="kiosk-step" style="text-align:center;">
-        <span style="font-size:4rem; display:block; margin-bottom:20px; animation:bounce 1s infinite alternate;">🎉</span>
+        <span style="font-size:4rem; display:block; margin-bottom:20px;" aria-hidden="true">✓</span>
         <h2 style="font-weight:800; color:var(--kiosk-primary);">주문 및 결제 완료</h2>
         <p style="color:#64748b; margin-top:10px; font-weight:700;">성공적으로 주문이 접수되었습니다.<br>영수증과 번호표를 챙겨 주세요.</p>
         <button class="kiosk-big-action-btn" style="margin-top:30px; background-color:#64748b;" onclick="resetKiosk()">첫 화면으로</button>
@@ -854,26 +1375,53 @@ window.confirmPopup = function() {
     addToCart(targetMenuItem);
     currentKioskState = "menu";
     renderKioskScreen();
-    speak(`${targetMenuItem.name}을 장바구니에 추가했습니다.`);
+    const cartMessage = `${targetMenuItem.name}을 장바구니에 추가했습니다.`;
+    speak(cartMessage);
+    updateSubtitle(cartMessage);
+    setJourneyStep(
+      "menu",
+      "메뉴를 장바구니에 담았습니다",
+      "다른 메뉴를 찾거나 결제로 이동하세요.",
+      "다른 메뉴 말하기"
+    );
   }
 };
 
 window.checkoutCart = function() {
   currentKioskState = "pay_select";
   renderKioskScreen();
-  speak("결제 수단 선택 화면입니다. 신용카드를 카드 투입구에 삽입해 주세요.");
+  const paymentMessage = "결제 수단 선택 화면입니다. 신용카드를 카드 투입구에 삽입해 주세요.";
+  speak(paymentMessage);
+  updateSubtitle(paymentMessage);
+  hapticInstructionText.textContent = "카드 투입구 위치를 방향음으로 안내합니다.";
+  setJourneyStep(
+    "payment",
+    "신용카드를 준비하세요",
+    "방향음을 따라 키오스크 아래의 카드 투입구를 찾으세요.",
+    "카드 삽입 완료"
+  );
 };
 
 window.insertCardMock = function() {
   currentKioskState = "done";
   renderKioskScreen();
-  speak("결제가 완료되었습니다. 주문 번호표를 확인해 주십시오. 이용해 주셔서 감사합니다.");
+  const doneMessage = "결제가 완료되었습니다. 주문 번호표를 확인해 주세요. 이용해 주셔서 감사합니다.";
+  speak(doneMessage);
+  updateSubtitle(doneMessage);
+  hapticInstructionText.textContent = "주문이 완료되었습니다. 새 주문은 아래 버튼으로 시작하세요.";
+  setJourneyStep(
+    "payment",
+    "주문이 완료되었습니다",
+    "영수증과 주문 번호표를 챙겨 주세요.",
+    "새 주문 시작"
+  );
 };
 
 window.resetKiosk = function() {
   currentKioskState = "start";
   currentCart = [];
   targetMenuItem = null;
+  pendingMenuConfirmation = false;
   isFreezed = false;
   renderKioskScreen();
 };
@@ -882,60 +1430,24 @@ window.resetKiosk = function() {
 // 5. Real-Time Video Frame Capture & Gemini Loop
 // --------------------------------------------------
 
-function generateKioskMockFrame(): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = 480;
-  canvas.height = 700;
-  const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
-
-  ctx.fillStyle = "#f8fafc";
-  ctx.fillRect(0, 0, 480, 700);
-
-  ctx.fillStyle = "#006241"; 
-  ctx.fillRect(0, 0, 480, 50);
-  ctx.fillStyle = "white";
-  ctx.font = "bold 16px sans-serif";
-  ctx.fillText(currentVenueData ? currentVenueData.name : "스타벅스", 20, 30);
-
-  if (currentKioskState === "start") {
-    ctx.fillStyle = "#006241";
-    ctx.fillRect(140, 550, 200, 60);
-  } 
-  
-  else if (currentKioskState === "menu") {
-    ctx.fillStyle = "#cbd5e1";
-    ctx.fillRect(0, 50, 480, 50);
-
-    if (currentVenueData) {
-      currentVenueData.menu.filter((i: any) => i.category === selectedCategory).forEach((item: any) => {
-        const bounds = item.button_bounds;
-        ctx.fillStyle = "white";
-        ctx.strokeStyle = "#cbd5e1";
-        ctx.lineWidth = 2;
-        ctx.fillRect(bounds[1], bounds[0], bounds[3] - bounds[1], bounds[2] - bounds[0]);
-        ctx.strokeRect(bounds[1], bounds[0], bounds[3] - bounds[1], bounds[2] - bounds[0]);
-
-        ctx.fillStyle = "#0f172a";
-        ctx.font = "bold 14px sans-serif";
-        ctx.fillText(item.name, bounds[1] + 15, bounds[0] + 40);
-        ctx.fillText(`${item.price}원`, bounds[1] + 15, bounds[0] + 80);
-      });
-    }
-  } 
-  
-  else if (currentKioskState === "pay_select") {
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(40, 200, 180, 150);
-    ctx.strokeRect(260, 200, 180, 150);
+function captureCameraFrame(): string | null {
+  if (
+    !cameraStream ||
+    cameraFeed.readyState < HTMLMediaElement.HAVE_CURRENT_DATA ||
+    cameraFeed.videoWidth === 0 ||
+    cameraFeed.videoHeight === 0
+  ) {
+    return null;
   }
 
-  ctx.fillStyle = "rgba(239, 68, 68, 0.6)";
-  ctx.beginPath();
-  ctx.arc(fingerX, fingerY, 20, 0, Math.PI * 2);
-  ctx.fill();
+  const canvas = document.createElement("canvas");
+  canvas.width = cameraFeed.videoWidth;
+  canvas.height = cameraFeed.videoHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
 
-  return canvas.toDataURL("image/jpeg");
+  ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.72);
 }
 
 // 마우스 무브 연동 (PC 테스팅용 백업)
@@ -945,12 +1457,63 @@ zeroUiTouchpad.addEventListener("mousemove", (e: MouseEvent) => {
   fingerY = Math.floor(((e.clientY - rect.top) / rect.height) * 700);
 });
 
-// 모바일 멀티터치 제스처 분기 바인딩 (1지: 조향/선택 vs 2지: 화면 정보 낭독 탐색 vs 3지: 뒤로가기)
-zeroUiTouchpad.addEventListener("touchstart", handleTouchpadGesture, { passive: false });
-zeroUiTouchpad.addEventListener("touchmove", handleTouchpadGesture, { passive: false });
-zeroUiTouchpad.addEventListener("touchend", (e: TouchEvent) => {
-  // 터치가 완전히 끝나면 비프음 정지
+// 모바일 멀티터치와 실제 더블 탭/롱프레스 판정
+let touchStartedAt = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+let lastTapAt = 0;
+let touchMoved = false;
+let touchLongPressTriggered = false;
+let touchLongPressTimer: number | null = null;
+
+zeroUiTouchpad.addEventListener("touchstart", (event) => {
+  if (event.touches.length === 1) {
+    touchStartedAt = Date.now();
+    touchStartX = event.touches[0].clientX;
+    touchStartY = event.touches[0].clientY;
+    touchMoved = false;
+    touchLongPressTriggered = false;
+    touchLongPressTimer = window.setTimeout(() => {
+      touchLongPressTriggered = true;
+      handleTouchpadLongPress();
+    }, 1000);
+  } else if (touchLongPressTimer !== null) {
+    clearTimeout(touchLongPressTimer);
+    touchLongPressTimer = null;
+  }
+  handleTouchpadGesture(event);
+}, { passive: false });
+
+zeroUiTouchpad.addEventListener("touchmove", (event) => {
+  if (event.touches.length === 1) {
+    const movedDistance = Math.hypot(
+      event.touches[0].clientX - touchStartX,
+      event.touches[0].clientY - touchStartY
+    );
+    if (movedDistance > 18) {
+      touchMoved = true;
+      if (touchLongPressTimer !== null) clearTimeout(touchLongPressTimer);
+      touchLongPressTimer = null;
+    }
+  }
+  handleTouchpadGesture(event);
+}, { passive: false });
+
+zeroUiTouchpad.addEventListener("touchend", () => {
+  if (touchLongPressTimer !== null) clearTimeout(touchLongPressTimer);
+  touchLongPressTimer = null;
   stopAudioSteering();
+
+  const now = Date.now();
+  const isTap = !touchMoved && !touchLongPressTriggered && now - touchStartedAt <= 320;
+  if (!isTap) return;
+
+  if (now - lastTapAt <= 450) {
+    lastTapAt = 0;
+    handleTouchpadDoubleTap();
+  } else {
+    lastTapAt = now;
+  }
 });
 
 let lastSpokenTime = 0;
@@ -960,33 +1523,37 @@ function handleTouchpadGesture(e: TouchEvent) {
   e.preventDefault(); // 스크롤 등 브라우저 기본 인터랙션 방지
   const rect = zeroUiTouchpad.getBoundingClientRect();
   const now = Date.now();
-  
+
+  if (!currentVenueData && e.touches.length <= 2) return;
+
   if (e.touches.length >= 5) {
     // --------------------------------------------------
     // 0. 주먹 터치 (5개 손가락 이상 넓은 접촉) ➔ "잠시 대기/일시정지 (Pause/Wait Mode)"
     // --------------------------------------------------
+    if (isPauseMode) return;
     stopAudioSteering(); // 조향 비프음 즉시 차단
+    isPauseMode = true;
     isFreezed = true;   // 분석 영상 프레임 전송 일시 중지
-    
+
     speak("안내를 일시 정지하고 대기 모드로 전환합니다. 다시 시작하려면 화면을 더블 탭해 주세요.");
     updateSubtitle("대기 모드 (일시 정지됨)");
   }
-  
+
   else if (e.touches.length === 3) {
     // --------------------------------------------------
     // 1. 3손가락 터치 (엄지, 검지, 중지) ➔ "뒤로가기 (Back Navigation)"
     // --------------------------------------------------
     stopAudioSteering(); // 조향음 차단
-    
+
     if (now - lastBackNavTime > 2000) { // 2초 디바운스
       lastBackNavTime = now;
-      
-      if (currentKioskState === "menu" || currentKioskState === "cart") {
+
+      if (currentKioskState === "menu" || currentKioskState === "cart_confirm") {
         speak("이전 화면으로 돌아갑니다.");
         updateSubtitle("이전 화면으로 이동합니다.");
-        currentKioskState = "welcome";
+        currentKioskState = "start";
         renderKioskScreen();
-      } else if (currentKioskState === "payment") {
+      } else if (currentKioskState === "pay_select") {
         speak("이전 화면으로 돌아갑니다.");
         updateSubtitle("이전 화면으로 이동합니다.");
         currentKioskState = "menu";
@@ -996,27 +1563,27 @@ function handleTouchpadGesture(e: TouchEvent) {
         updateSubtitle("첫 화면입니다.");
       }
     }
-  } 
-  
+  }
+
   else if (e.touches.length === 2) {
     // --------------------------------------------------
     // 2. 손가락 2개 터치 ➔ "화면 정보 낭독 탐색 (Explore)"
     // --------------------------------------------------
     stopAudioSteering(); // 조향용 3D 비프음을 차단하여 낭독에 집중시킴
-    
+
     // 두 손가락의 중심 좌표 계산
     const t1 = e.touches[0];
     const t2 = e.touches[1];
     const avgClientX = (t1.clientX + t2.clientX) / 2;
     const avgClientY = (t1.clientY + t2.clientY) / 2;
-    
+
     fingerX = Math.floor(((avgClientX - rect.left) / rect.width) * 480);
     fingerY = Math.floor(((avgClientY - rect.top) / rect.height) * 700);
 
     // 2지 드래그 시, 1.5초 간격으로 현재 손끝 아래 겹치는 메뉴 정보를 TTS로 실시간 브리핑
     if (now - lastSpokenTime > 1500) {
       lastSpokenTime = now;
-      
+
       if (currentVenueData && currentVenueData.menu) {
         const hoveredItem = currentVenueData.menu.find((item: any) => {
           const bounds = item.button_bounds;
@@ -1035,8 +1602,8 @@ function handleTouchpadGesture(e: TouchEvent) {
         }
       }
     }
-  } 
-  
+  }
+
   else if (e.touches.length === 1) {
     // --------------------------------------------------
     // 3. 손가락 1개 터치 ➔ "선택 모드 & 조향 유도 (Aim-Assist / Select)"
@@ -1044,7 +1611,7 @@ function handleTouchpadGesture(e: TouchEvent) {
     if (isVoiceMode) {
       startAudioSteering(); // 원하는 버튼을 찾도록 비프 조향음을 다시 개시!
     }
-    
+
     const t = e.touches[0];
     fingerX = Math.floor(((t.clientX - rect.left) / rect.width) * 480);
     fingerY = Math.floor(((t.clientY - rect.top) / rect.height) * 700);
@@ -1062,13 +1629,13 @@ function handleTouchpadGesture(e: TouchEvent) {
       // 만약 손끝이 정확히 타겟 중심점 근방(조준 완료 영역)에 안착해 있다면 최종 락
       if (selectedItem && targetMenuItem && selectedItem.name === targetMenuItem.name) {
         const distance = Math.hypot(fingerX - (selectedItem.button_bounds[1] + selectedItem.button_bounds[3])/2, fingerY - (selectedItem.button_bounds[0] + selectedItem.button_bounds[2])/2);
-        
+
         if (distance < 15) { // 락인 범위 감지 시 탭 처리
           stopAudioSteering();
           const selectText = `${selectedItem.name}을 장바구니에 담기 위해 최종 선택하셨습니다.`;
           speak(selectText);
           updateSubtitle(selectText);
-          
+
           setTimeout(() => {
             addToCart(selectedItem);
             currentKioskState = "menu";
@@ -1083,7 +1650,8 @@ function handleTouchpadGesture(e: TouchEvent) {
 async function sendVideoFrameToServer() {
   if (isFreezed) return;
 
-  const base64Image = generateKioskMockFrame();
+  const base64Image = captureCameraFrame();
+  if (!base64Image) return;
   const payload = {
     image: base64Image,
     targetMenu: targetMenuItem ? targetMenuItem.name : "",
@@ -1120,9 +1688,13 @@ function handleAutoTriggerAction() {
     currentKioskState = "popup";
     renderKioskScreen();
   } else if (currentKioskState === "pay_select") {
-    insertCardMock();
+    window.insertCardMock();
   }
 }
+
+window.addEventListener("pagehide", () => {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+});
 
 // --------------------------------------------------
 // 6. Contributor Dashboard & Leaderboard (게이미피케이션)
@@ -1152,12 +1724,13 @@ function loadLeaderboard() {
     });
 }
 
-const btnSubmitContribution = document.getElementById("btn-submit-contribution") as HTMLButtonElement;
+const contributionForm = document.getElementById("contribution-form") as HTMLFormElement;
 const contribUsername = document.getElementById("contrib-username") as HTMLInputElement;
 const contribVenue = document.getElementById("contrib-venue") as HTMLInputElement;
 const contribStatusMsg = document.getElementById("contrib-status-msg") as HTMLElement;
 
-btnSubmitContribution.addEventListener("click", () => {
+contributionForm.addEventListener("submit", (event) => {
+  event.preventDefault();
   const username = contribUsername.value.trim();
   const venueName = contribVenue.value.trim();
 
@@ -1186,12 +1759,16 @@ tabLeaderboard.addEventListener("click", () => {
   tabContribute.classList.remove("active");
   paneLeaderboard.classList.add("active");
   paneContribute.classList.remove("active");
+  tabLeaderboard.setAttribute("aria-selected", "true");
+  tabContribute.setAttribute("aria-selected", "false");
 });
 tabContribute.addEventListener("click", () => {
   tabContribute.classList.add("active");
   tabLeaderboard.classList.remove("active");
   paneContribute.classList.add("active");
   paneLeaderboard.classList.remove("active");
+  tabContribute.setAttribute("aria-selected", "true");
+  tabLeaderboard.setAttribute("aria-selected", "false");
 });
 
 // --------------------------------------------------
@@ -1203,17 +1780,18 @@ const contribMapCanvas = document.getElementById("contrib-map-canvas") as HTMLEl
 
 btnGpsRefresh.addEventListener("click", () => {
   if (!("geolocation" in navigator)) {
-    alert("GPS를 지원하지 않는 브라우저입니다.");
+    contribStatusMsg.textContent = "이 브라우저는 위치 검색을 지원하지 않습니다. 매장 이름을 직접 입력하세요.";
     return;
   }
 
-  btnGpsRefresh.textContent = "📍 검색 중...";
+  btnGpsRefresh.textContent = "검색 중…";
+  btnGpsRefresh.disabled = true;
   navigator.geolocation.getCurrentPosition((position) => {
     const lat = position.coords.latitude;
     const lng = position.coords.longitude;
-    
+
     console.log(`📍 현재 위치 감지: ${lat}, ${lng}`);
-    
+
     // 구글 Places API 연동 흉내내기 (내 위치 주변의 등록된 매장 목록 추천 빌드)
     const mockNearbyPlaces = [
       { name: "스타벅스 신라호텔점", address: "서울특별시 중구 동호로 249", placeId: "chIJs234" },
@@ -1233,24 +1811,26 @@ btnGpsRefresh.addEventListener("click", () => {
       contribGpsVenues.appendChild(opt);
     });
 
-    btnGpsRefresh.textContent = "📍 완료";
-    contribStatusMsg.textContent = "🗺️ 내 주변 매장 추천 완료!";
+    btnGpsRefresh.textContent = "주변 매장 다시 찾기";
+    btnGpsRefresh.disabled = false;
+    contribStatusMsg.textContent = "내 주변 매장을 불러왔습니다.";
     setTimeout(() => { contribStatusMsg.textContent = ""; }, 2000);
   }, () => {
-    btnGpsRefresh.textContent = "📍 실패";
-    alert("위치 정보를 가져올 수 없습니다. 권한을 확인하세요.");
+    btnGpsRefresh.textContent = "현재 위치로 찾기";
+    btnGpsRefresh.disabled = false;
+    contribStatusMsg.textContent = "위치를 가져올 수 없습니다. 위치 권한을 확인하거나 매장 이름을 직접 입력하세요.";
   });
 });
 
 contribGpsVenues.addEventListener("change", (e: any) => {
   const selectedName = e.target.value;
   if (!selectedName) {
-    contribMapCanvas.style.display = "none";
+    contribMapCanvas.hidden = true;
     return;
   }
 
   contribVenue.value = selectedName;
-  contribMapCanvas.style.display = "block";
+  contribMapCanvas.hidden = false;
   renderMiniGoogleMap(selectedName);
 });
 
@@ -1262,7 +1842,7 @@ const contribSearchResults = document.getElementById("contrib-search-results") a
 contribVenue.addEventListener("input", (e: any) => {
   const query = e.target.value.trim();
   if (query.length < 2) {
-    contribSearchResults.style.display = "none";
+    contribSearchResults.hidden = true;
     return;
   }
 
@@ -1276,44 +1856,43 @@ contribVenue.addEventListener("input", (e: any) => {
   ];
 
   const matched = mockDb.filter(place => place.name.includes(query) || place.address.includes(query));
-  
+
   if (matched.length === 0) {
-    contribSearchResults.style.display = "none";
+    contribSearchResults.hidden = true;
     return;
   }
 
   contribSearchResults.innerHTML = "";
-  contribSearchResults.style.display = "block";
+  contribSearchResults.hidden = false;
 
   matched.forEach(place => {
-    const div = document.createElement("div");
-    div.style.padding = "8px 12px";
-    div.style.cursor = "pointer";
-    div.style.borderBottom = "1px solid var(--border-color)";
-    div.style.fontSize = "0.75rem";
-    div.innerHTML = `<strong>${place.name}</strong><br><span style="color:var(--text-secondary);">${place.address}</span>`;
-    
-    div.addEventListener("click", () => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "search-result-option";
+    option.setAttribute("role", "option");
+    option.innerHTML = `<strong>${place.name}</strong><span>${place.address}</span>`;
+
+    option.addEventListener("click", () => {
       contribVenue.value = place.name;
-      contribSearchResults.style.display = "none";
-      contribMapCanvas.style.display = "block";
+      contribSearchResults.hidden = true;
+      contribMapCanvas.hidden = false;
       renderMiniGoogleMap(place.name);
     });
-    
-    contribSearchResults.appendChild(div);
+
+    contribSearchResults.appendChild(option);
   });
 });
 
 // 클릭 시 Autocomplete 창 닫기 바인딩
 document.addEventListener("click", (e: any) => {
-  if (e.target !== contribVenue && e.target !== contribSearchResults) {
-    contribSearchResults.style.display = "none";
+  if (e.target !== contribVenue && !contribSearchResults.contains(e.target)) {
+    contribSearchResults.hidden = true;
   }
 });
 
 function renderMiniGoogleMap(venueName: string) {
   contribMapCanvas.innerHTML = "";
-  
+
   // 가상 지도 핀 드로잉 Canvas 생성
   const mapCanvas = document.createElement("canvas");
   mapCanvas.width = 400;
@@ -1323,7 +1902,7 @@ function renderMiniGoogleMap(venueName: string) {
   // 지도 배경 그리드 그리기
   ctx.fillStyle = "#e2e8f0";
   ctx.fillRect(0, 0, 400, 80);
-  
+
   ctx.strokeStyle = "#cbd5e1";
   ctx.lineWidth = 1;
   for (let i = 0; i < 400; i += 20) {
@@ -1344,7 +1923,7 @@ function renderMiniGoogleMap(venueName: string) {
   ctx.beginPath();
   ctx.arc(200, 30, 8, 0, Math.PI * 2);
   ctx.fill();
-  
+
   ctx.beginPath();
   ctx.moveTo(192, 30);
   ctx.lineTo(200, 48);
