@@ -109,8 +109,7 @@ const locales: any = {
     onboardingText: "자막 가이드 모드가 활성화되었습니다. 키오스크 기기를 정면으로 비춰 주세요.",
     touchpadText: "화면을 더블 탭(Double Tap)하여<br>음성 인식을 켜고 명령을 내리세요",
     navStep1: "1단계. 매장 내 키오스크 탐색을 시작합니다. 휴대폰 후면 카메라를 정면을 향해 들고 천천히 걸어가세요.",
-    navStep1Sub: "1단계: 매장 내 키오스크 위치 탐색 중. 폰을 정면으로 들어 비추며 걸어가세요.",
-    saveConfirm: "이 언어 선택을 기본값으로 저장할까요? 저장하려면 화면을 더블 탭, 아니면 화면을 길게 눌러 다시 선택해 주세요."
+    navStep1Sub: "1단계: 매장 내 키오스크 위치 탐색 중. 폰을 정면으로 들어 비추며 걸어가세요."
   },
   en: {
     welcome: "Welcome to Echo-Menu. Do you need voice assistance? Double tap for voice guide, or long press for large subtitles.",
@@ -118,8 +117,7 @@ const locales: any = {
     onboardingText: "Subtitle guide activated. Please point your camera at the kiosk screen.",
     touchpadText: "Double tap the screen to<br>activate voice input and command",
     navStep1: "Step 1. Starting kiosk search. Please hold your phone forward and walk slowly.",
-    navStep1Sub: "Step 1: Finding kiosk... Hold your phone up and face the front.",
-    saveConfirm: "Would you like to save this language as default? Double tap to save, or long press to re-select."
+    navStep1Sub: "Step 1: Finding kiosk... Hold your phone up and face the front."
   },
   zh: {
     welcome: "欢迎使用声音菜单。您需要语音助手吗？双击屏幕开启语音指南，长按屏幕使用大字幕指南。",
@@ -127,8 +125,7 @@ const locales: any = {
     onboardingText: "字幕指南已激活。请将相机对准自助点餐机屏幕。",
     touchpadText: "双击屏幕<br>激活语音输入和指令",
     navStep1: "步骤 1. 开始搜索自助机。请将手机向前拿并慢走。",
-    navStep1Sub: "步骤 1: 寻找自助机中... 拿起手机面向前方。",
-    saveConfirm: "是否将此语言保存为默认语言？双击保存，长按重新选择。"
+    navStep1Sub: "步骤 1: 寻找自助机中... 拿起手机面向前方。"
   },
   ja: {
     welcome: "音声メニューへようこそ。音声アシストが必要ですか？音声ガイドが必要な場合はダブルタップ、大文字字幕ガイドは長押ししてください。",
@@ -136,8 +133,7 @@ const locales: any = {
     onboardingText: "字幕ガイドが有効になりました。カメラをキオスク画面に向けてください。",
     touchpadText: "画面をダブルタップして<br>音声入力とコマンドを有効にします",
     navStep1: "ステップ 1. キオスクの探索を開始します。スマホを前に向けてゆっくり歩いてください。",
-    navStep1Sub: "ステップ 1: キオスク探索中... スマ호を前に向けてください。",
-    saveConfirm: "この言語をデフォルトとして保存しますか？保存する場合はダブルタップ、再選択する場合は長押ししてください。"
+    navStep1Sub: "ステップ 1: キオスク探索中... スマホを前に向けてください。"
   },
   ru: {
     welcome: "Добро пожаловать в Голосовое меню. Нужна помощь? Дважды коснитесь для аудиогида, зажмите для крупных субтитров.",
@@ -145,8 +141,7 @@ const locales: any = {
     onboardingText: "Субтитры активированы. Направьте камеру на экран киоска.",
     touchpadText: "Дважды коснитесь экрана для<br>активации голосового ввода и команд",
     navStep1: "Шаг 1. Поиск киоска. Держите телефон перед собой и идите медленно.",
-    navStep1Sub: "Шаг 1: Поиск киоска... Направьте телефон вперед.",
-    saveConfirm: "Сохранить этот язык по умолчанию? Дважды коснитесь для сохранения, зажмите для сброса."
+    navStep1Sub: "Шаг 1: Поиск киоска... Направьте телефон вперед."
   },
   de: {
     welcome: "Willkommen beim Echo-Menu. Benötigen Sie Sprachunterstützung? Doppeltippen für Sprachführung, lange drücken für große Untertitel.",
@@ -154,8 +149,7 @@ const locales: any = {
     onboardingText: "Untertitel aktiviert. Bitte richten Sie die Kamera auf den Kiosk-Bildschirm.",
     touchpadText: "Doppeltippen Sie auf den Bildschirm,<br>um die Spracheingabe zu aktivieren",
     navStep1: "Schritt 1. Kiosk-Suche gestartet. Bitte halten Sie Ihr Telefon nach vorne und gehen Sie langsam.",
-    navStep1Sub: "Schritt 1: Kiosk suchen... Halten Sie das Telefon nach vorne.",
-    saveConfirm: "Möchten Sie diese Sprache als Standard speichern? Doppeltippen zum Speichern, lange drücken zum Zurücksetzen."
+    navStep1Sub: "Schritt 1: Kiosk suchen... Halten Sie das Telefon nach vorne."
   },
   ar: {
     welcome: "مرحبًا بك في إيكو منيو. هل تحتاج إلى مساعدة صوتية؟ انقر نقرًا مزدوجًا للإرشاد الصوتي، أو اضغط مطولاً للحصول على ترجمة كبيرة.",
@@ -163,27 +157,27 @@ const locales: any = {
     onboardingText: "تم تفعيل الترجمة. يرجى توجيه الكاميرا إلى شاشة الكشك.",
     touchpadText: "انقر نقرًا مزدوجًا على الشاشة<br>لتفعيل الإدخال الصوتي والأوامر",
     navStep1: "الخطوة 1. بدء البحث عن الكشك. يرجى توجيه الهاتف للأمام والمشي ببطء.",
-    navStep1Sub: "الخطوة 1: العثور على الكشك... وجه الهاتف للأمام.",
-    saveConfirm: "هل ترغب في حفظ هذه اللغة كافتراضية؟ انقر نقرًا مزدوجًا للحفظ، أو اضغط مطولاً لإعادة الاختيار."
+    navStep1Sub: "الخطوة 1: العثور على الكشك... وجه الهاتف للأمام."
   }
 };
 
 // 언어 코드 및 순차 낭독 멘트 셋업
 const langList: string[] = ["ko", "en", "zh", "ja", "ru", "de", "ar"];
 const langSelectorPrompts: any = {
-  ko: { text: "한국어로 말할까요? 원하시면 화면을 더블 탭해 주세요.", locale: "ko-KR" },
-  en: { text: "Would you like to speak in English? If so, please double tap.", locale: "en-US" },
-  zh: { text: "您想用中文交流吗？如果想，请双击屏幕。", locale: "zh-CN" },
-  ja: { text: "日本語で話しましょうか？ご希望の場合は、ダブルタップしてください。", locale: "ja-JP" },
-  ru: { text: "Хотите говорить по-русски? Если да, дважды коснитесь экрана.", locale: "ru-RU" },
-  de: { text: "Möchten Sie auf Deutsch sprechen? Wenn ja, bitte doppeltippen.", locale: "de-DE" },
-  ar: { text: "هل ترغب في التحدث باللغة العربية؟ إذا كان الأمر كذلك، يرجى النقر نقرًا مزدوجًا.", locale: "ar-SA" }
+  ko: { text: "한국어 안내입니다. 다시 들으려면 화면을 길게 누르고, 한국어를 선택하려면 화면을 두 번 탭해 주세요.", locale: "ko-KR" },
+  en: { text: "English guidance. Press and hold to hear this again. To select English, double tap the screen.", locale: "en-US" },
+  zh: { text: "这是中文语音提示。长按可重新收听。要选择中文，请双击屏幕。", locale: "zh-CN" },
+  ja: { text: "日本語の案内です。もう一度聞くには長押ししてください。日本語を選ぶには、画面をダブルタップしてください。", locale: "ja-JP" },
+  ru: { text: "Инструкция на русском языке. Чтобы прослушать ещё раз, нажмите и удерживайте. Чтобы выбрать русский язык, дважды коснитесь экрана.", locale: "ru-RU" },
+  de: { text: "Deutsche Sprachausgabe. Zum erneuten Anhören gedrückt halten. Um Deutsch auszuwählen, tippen Sie zweimal auf den Bildschirm.", locale: "de-DE" },
+  ar: { text: "إرشادات باللغة العربية. للاستماع مرة أخرى، اضغط مطولاً. لاختيار العربية، انقر نقراً مزدوجاً على الشاشة.", locale: "ar-SA" }
 };
 
 let userLang: string = "ko";
 let t = locales[userLang];
 let currentSelectionIndex: number = 0;
 let languageLoopTimeout: any = null;
+let languageAnnouncementVersion: number = 0;
 let isSelectingLanguage: boolean = false;
 let tempSelectedLang: string = "ko";
 let isVoiceTurningOffConfirm: boolean = false; // 음성 기능 해제 확인용 플래그
@@ -193,7 +187,7 @@ let isPermissionGranted: boolean = false;
 let isPermissionChoicePending: boolean = false;
 let permissionTapCount: number = 0;
 let permissionTapTimer: number | null = null;
-let onboardingState: "looping" | "confirming" | "completed" = "looping";
+let onboardingState: "looping" | "completed" = "looping";
 let venueConfirmationPending: boolean = false;
 let isKioskNavigationActive: boolean = false;
 let pendingMenuConfirmation: boolean = false;
@@ -348,47 +342,25 @@ function captureVenueAnswer() {
 
 // 최초 진입 시 음성 온보딩 실행
 window.addEventListener("DOMContentLoaded", () => {
-  // 브라우저 로컬 저장소 확인
-  const savedLang = localStorage.getItem("user_language");
-  if (savedLang && locales[savedLang]) {
-    // 이미 언어가 영구 저장된 경우: 순차 낭독 생략하고 즉시 해당 다국어로 기동
-    userLang = savedLang;
-    t = locales[userLang];
-
-    // 시작하기 위해 더블탭 유도
-    const welcomeMsg = t.welcome;
-    speak(welcomeMsg);
-    updateSubtitle(welcomeMsg);
-    onboardingState = "completed";
-    currentLanguageLabel.textContent = languageNames[userLang];
-    hapticInstructionText.textContent = "기기 권한 안내를 시작하려면 화면을 두 번 탭하세요.";
-    setJourneyStep(
-      "permission",
-      "카메라와 마이크를 준비합니다",
-      "화면을 두 번 탭하면 권한 요청과 음성 안내가 함께 시작됩니다.",
-      "카메라·마이크 허용하기"
-    );
-  } else {
-    // 저장된 언어가 없는 경우: 즉시 7개국어 순차 최초 웰컴 가이드 낭독 루프 가동 (외국인 인지 장벽 원천 제거)
-    isSelectingLanguage = true;
-    onboardingState = "looping";
-    currentSelectionIndex = 0;
-    setJourneyStep(
-      "language",
-      "안내 언어를 듣고 있습니다",
-      "원하는 언어가 들리면 화면을 두 번 탭하거나 아래 버튼을 누르세요.",
-      "현재 언어 선택",
-      { showLanguage: true }
-    );
-    runLanguageSelectionLoop();
-  }
+  // 저장 여부와 관계없이 서비스 진입 즉시 7개 언어 안내를 시작한다.
+  isSelectingLanguage = true;
+  onboardingState = "looping";
+  currentSelectionIndex = 0;
+  setJourneyStep(
+    "language",
+    "안내 언어를 듣고 있습니다",
+    "다시 들으려면 길게 누르고, 현재 언어를 선택하려면 화면을 두 번 탭하세요.",
+    "현재 언어 선택",
+    { showLanguage: true }
+  );
+  runLanguageSelectionLoop();
 
   // 온보딩 더블탭 및 롱프레스 제스처 바인딩
   zeroUiTouchpad.addEventListener("dblclick", handleTouchpadDoubleTap);
 
   let pressTimer: number;
   zeroUiTouchpad.addEventListener("mousedown", () => {
-    pressTimer = window.setTimeout(handleTouchpadLongPress, 2000);
+    pressTimer = window.setTimeout(handleTouchpadLongPress, 1000);
   });
   zeroUiTouchpad.addEventListener("mouseup", () => clearTimeout(pressTimer));
   zeroUiTouchpad.addEventListener("mouseleave", () => clearTimeout(pressTimer));
@@ -401,6 +373,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   flowPrimaryAction.addEventListener("click", handleTouchpadDoubleTap);
   repeatGuidanceBtn.addEventListener("click", () => {
+    if (isSelectingLanguage && onboardingState === "looping") {
+      runLanguageSelectionLoop();
+      return;
+    }
     if (pendingVenueAnswer) {
       pendingVenueAnswer = null;
       speak("띵동 소리가 들리면 음식점 이름을 다시 대답해 주세요.", captureVenueAnswer);
@@ -711,42 +687,14 @@ function handleTouchpadDoubleTap() {
     return;
   }
 
-  const savedLang = localStorage.getItem("user_language");
-
-  // 1. 아직 언어가 미설정된 대기 상태인 경우 ➔ 순차 언어 낭독 루프 개시
-  if (!savedLang && !isSelectingLanguage) {
-    isSelectingLanguage = true;
-    onboardingState = "looping";
-    currentSelectionIndex = 0;
-    runLanguageSelectionLoop();
-    return;
-  }
-
-  // 2. 순차 언어 낭독 중에 탭이 들어온 경우 ➔ 해당 언어 임시 락인 및 "저장할까요?" 컨펌 단계 진입
+  // 순차 안내 중 톡톡 두 번 탭하면 현재 언어를 즉시 선택한다.
   if (isSelectingLanguage && onboardingState === "looping") {
-    onboardingState = "confirming";
+    languageAnnouncementVersion += 1;
     if (languageLoopTimeout) {
       clearTimeout(languageLoopTimeout);
       languageLoopTimeout = null;
     }
-
-    // 임시 락인 상태에서 컨펌 메시지 재생
-    const confirmPrompt = locales[tempSelectedLang].saveConfirm;
-    speak(confirmPrompt);
-    updateSubtitle(confirmPrompt);
-    hapticInstructionText.textContent = "이 언어를 저장하려면 다시 두 번 탭하세요. 다른 언어를 들으려면 길게 누르세요.";
-    setJourneyStep(
-      "language",
-      `${languageNames[tempSelectedLang]}를 선택했습니다`,
-      "이 언어를 기본 안내 언어로 저장할까요?",
-      "이 언어로 계속",
-      { showLanguage: true }
-    );
-    return;
-  }
-
-  // 3. 임시 락인 상태에서 수락 더블 탭 ➔ 영구 저장 및 권한 획득 온보딩 시작
-  if (isSelectingLanguage && onboardingState === "confirming") {
+    window.speechSynthesis.cancel();
     localStorage.setItem("user_language", tempSelectedLang);
     userLang = tempSelectedLang;
     t = locales[userLang];
@@ -765,8 +713,8 @@ function handleTouchpadDoubleTap() {
     return;
   }
 
-  // 4. 언어 세팅 완료 후의 일반적인 주문 더블탭
-  if (savedLang) {
+  // 언어 선택 완료 후의 일반적인 주문 더블 탭
+  if (localStorage.getItem("user_language")) {
     if (!isPermissionGranted) {
       showPermissionChoice();
     } else {
@@ -775,7 +723,7 @@ function handleTouchpadDoubleTap() {
   }
 }
 
-// 롱프레스 액션 핸들러 (취소 또는 자막모드 전환)
+// 롱프레스 액션 핸들러
 function handleTouchpadLongPress() {
   // 0. 음성 기능 끄기 이중 확인 중인 경우 ➔ 롱프레스 시 끄기 취소 (음성 유지)
   if (isVoiceTurningOffConfirm) {
@@ -783,6 +731,13 @@ function handleTouchpadLongPress() {
     const keepMsg = "음성 안내를 계속 사용합니다.";
     speak(keepMsg);
     updateSubtitle(keepMsg);
+    return;
+  }
+
+  // 언어 안내 중에는 현재 언어를 처음부터 다시 들려준다.
+  if (isSelectingLanguage && onboardingState === "looping") {
+    hapticInstructionText.textContent = "현재 언어 안내를 다시 들려드립니다. 선택하려면 화면을 두 번 탭하세요.";
+    runLanguageSelectionLoop();
     return;
   }
 
@@ -800,25 +755,7 @@ function handleTouchpadLongPress() {
     return;
   }
 
-  // 1. 언어 선택 컨펌 단계에서 롱프레스 ➔ 임시 락인 취소하고 순차 낭독 루프 재개
-  if (isSelectingLanguage && onboardingState === "confirming") {
-    onboardingState = "looping";
-    currentSelectionIndex = (langList.indexOf(tempSelectedLang) + 1) % langList.length;
-    hapticInstructionText.textContent = "다음 언어를 듣고 있습니다. 원하는 언어에서 두 번 탭하세요.";
-    setJourneyStep(
-      "language",
-      "다음 안내 언어를 듣습니다",
-      "원하는 언어가 들리면 화면을 두 번 탭하거나 아래 버튼을 누르세요.",
-      "현재 언어 선택",
-      { showLanguage: true }
-    );
-    speak("Cancelled.", () => {
-      runLanguageSelectionLoop();
-    });
-    return;
-  }
-
-  // 2. 그 외 일반 상태 ➔ 자막 전용 모드로 강제 강등
+  // 그 외 일반 상태에서는 자막 전용 모드로 전환한다.
   isVoiceMode = false;
   toggleVoiceOn.checked = false;
   window.speechSynthesis.cancel();
@@ -837,6 +774,12 @@ function handleTouchpadLongPress() {
 function runLanguageSelectionLoop() {
   if (!isSelectingLanguage || onboardingState !== "looping") return;
 
+  if (languageLoopTimeout) {
+    clearTimeout(languageLoopTimeout);
+    languageLoopTimeout = null;
+  }
+
+  const announcementVersion = ++languageAnnouncementVersion;
   const currentLang = langList[currentSelectionIndex];
   tempSelectedLang = currentLang;
   const prompt = langSelectorPrompts[currentLang];
@@ -846,10 +789,17 @@ function runLanguageSelectionLoop() {
 
   // 해당 국가의 언어 발음(locale)으로 질문 낭독
   speak(prompt.text, () => {
-    // 낭독 완료 후 3.5초간 사용자의 더블탭 입력을 대기함
-    if (onboardingState === "looping") {
+    // 이전 안내를 취소하고 다시 재생한 경우 오래된 콜백은 무시한다.
+    if (announcementVersion !== languageAnnouncementVersion) return;
+
+    // 낭독 완료 후 3.5초간 사용자의 제스처 입력을 기다린다.
+    if (isSelectingLanguage && onboardingState === "looping") {
       languageLoopTimeout = setTimeout(() => {
-        if (isSelectingLanguage && onboardingState === "looping") {
+        if (
+          announcementVersion === languageAnnouncementVersion &&
+          isSelectingLanguage &&
+          onboardingState === "looping"
+        ) {
           // 더블탭이 없었으면 다음 언어로 인덱스 변환하여 루프 재귀 호출
           currentSelectionIndex = (currentSelectionIndex + 1) % langList.length;
           runLanguageSelectionLoop();
