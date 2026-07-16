@@ -28,7 +28,16 @@ async function installBrowserStubs(page: Page) {
       configurable: true,
       value: {
         async getUserMedia() {
-          return new MediaStream();
+          (window as any).__getUserMediaCalls = ((window as any).__getUserMediaCalls || 0) + 1;
+          const stream = new MediaStream();
+          Object.defineProperty(stream, "getAudioTracks", {
+            value: () => [{
+              stop() {
+                (window as any).__audioTrackStops = ((window as any).__audioTrackStops || 0) + 1;
+              }
+            }]
+          });
+          return stream;
         }
       }
     });
@@ -49,9 +58,14 @@ async function installBrowserStubs(page: Page) {
       maxAlternatives = 1;
       onresult?: (event: any) => void;
       onspeechend?: () => void;
-      onerror?: () => void;
+      onerror?: (event: any) => void;
 
       start() {
+        const speechError = (window as any).__speechError;
+        if (speechError) {
+          window.setTimeout(() => this.onerror?.({ error: speechError }), 0);
+          return;
+        }
         const transcript = (window as any).__speechQueue.shift() || "스타벅스";
         window.setTimeout(() => {
           this.onresult?.({ results: [[{ transcript }]] });
@@ -89,6 +103,13 @@ test("모바일 주문 흐름을 명시적 버튼만으로 완료한다", async 
   await expect(page.locator("#flow-primary-action")).toHaveText("이 언어로 계속");
   await doubleTapTouchpad(page);
 
+  await expect(page.locator("#permission-choice-surface")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__getUserMediaCalls || 0)).toBe(0);
+  await page.touchscreen.tap(24, 180);
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as any).__getUserMediaCalls || 0)).toBe(1);
+  expect(await page.evaluate(() => (window as any).__audioTrackStops || 0)).toBe(1);
+
   await expect(page.locator("#flow-title")).toHaveText("스타벅스로 들었습니다", { timeout: 10_000 });
   await expect(page.locator("#flow-primary-action")).toHaveText("이 답변 제출");
   await page.locator("#flow-primary-action").click();
@@ -110,6 +131,37 @@ test("모바일 주문 흐름을 명시적 버튼만으로 완료한다", async 
 
   await page.locator("#flow-primary-action").click();
   await expect(page.locator("#flow-title")).toHaveText("주문이 완료되었습니다");
+});
+
+test("권한 선택에서 화면 두 번 탭은 마이크와 카메라 요청을 거절한다", async ({ page }) => {
+  await installBrowserStubs(page);
+  await page.goto("/");
+
+  await doubleTapTouchpad(page);
+  await doubleTapTouchpad(page);
+  await expect(page.locator("#permission-choice-surface")).toBeVisible();
+
+  await page.touchscreen.tap(30, 190);
+  await page.waitForTimeout(90);
+  await page.touchscreen.tap(30, 190);
+  await page.waitForTimeout(500);
+
+  expect(await page.evaluate(() => (window as any).__getUserMediaCalls || 0)).toBe(0);
+  await expect(page.locator("#permission-choice-surface")).toBeHidden();
+  await expect(page.locator("#flow-title")).toHaveText("권한을 사용하지 않습니다");
+  await expect(page.locator("#flow-primary-action")).toHaveText("권한 다시 선택");
+});
+
+test("마이크 캡처 실패 원인을 구체적인 음성 안내로 구분한다", async ({ page }) => {
+  await installBrowserStubs(page);
+  await page.goto("/");
+  await page.evaluate(() => { (window as any).__speechError = "audio-capture"; });
+
+  await doubleTapTouchpad(page);
+  await doubleTapTouchpad(page);
+  await page.touchscreen.tap(24, 180);
+
+  await expect(page.locator("#subtitle-box")).toContainText("다른 앱이 마이크를 사용 중인지 확인", { timeout: 10_000 });
 });
 
 test("기여 기능은 주문 화면과 분리되어 동작한다", async ({ page }) => {

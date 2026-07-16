@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/main-DIZjQeCT.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-D3b7nTlx.css">
+  <script type="module" crossorigin src="/assets/main-hnXPMFyY.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-NpL9i1aO.css">
 </head>
 <body>
   <a class="skip-link" href="#main-content">주요 내용으로 이동</a>
@@ -180,6 +180,28 @@
       </div>
     </section>
   </main>
+
+  <section
+    id="permission-choice-surface"
+    class="permission-choice-surface"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="permission-choice-title"
+    aria-describedby="permission-choice-description permission-browser-note"
+    tabindex="0"
+    hidden
+  >
+    <div class="permission-choice-content">
+      <p class="flow-kicker">카메라·마이크 권한</p>
+      <h2 id="permission-choice-title">카메라와 마이크를 사용할까요?</h2>
+      <p id="permission-choice-description">화면 아무 곳이나 한 번 탭하면 허용을 진행하고, 두 번 탭하면 사용하지 않습니다.</p>
+      <div class="permission-tap-options" aria-hidden="true">
+        <span><strong>한 번 탭</strong> 허용</span>
+        <span><strong>두 번 탭</strong> 사용하지 않음</span>
+      </div>
+      <p id="permission-browser-note" class="permission-browser-note">한 번 탭한 뒤 브라우저 권한 창이 열리면 브라우저의 허용 버튼을 눌러주세요.</p>
+    </div>
+  </section>
 
   <video id="camera-feed" class="camera-feed" autoplay playsinline muted aria-hidden="true"></video>
 
