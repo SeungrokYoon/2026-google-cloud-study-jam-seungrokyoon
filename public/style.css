@@ -89,13 +89,14 @@ a:focus-visible {
 }
 
 .camera-feed {
-  position: fixed;
-  width: 1px;
-  height: 1px;
-  bottom: 0;
-  right: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 180ms ease-out;
 }
 
 .permission-choice-surface {
@@ -231,34 +232,19 @@ a:focus-visible {
   font-size: 0.75rem;
 }
 
-.role-navigation {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--surface-muted);
-  border-radius: var(--radius-md);
-}
-
-.role-tab {
-  min-width: 112px;
-  padding: 9px 14px;
-  border: 0;
+.role-link {
+  min-height: 44px;
+  padding: 10px 14px;
+  display: inline-flex;
+  align-items: center;
   border-radius: 6px;
-  background: transparent;
-  color: var(--ink-soft);
-  cursor: pointer;
+  color: var(--primary-strong);
   font-weight: 700;
-  transition: background-color 180ms ease-out, color 180ms ease-out;
+  text-decoration: none;
 }
 
-.role-tab:hover {
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.65);
-}
-
-.role-tab.active {
-  color: #fff;
-  background: var(--primary);
+.role-link:hover {
+  background: var(--primary-soft);
 }
 
 .assist-view,
@@ -345,9 +331,12 @@ a:focus-visible {
 }
 
 .companion-panel {
-  width: min(720px, 100%);
+  width: min(1080px, 100%);
   margin: 0 auto;
-  padding: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .companion-heading {
@@ -485,8 +474,8 @@ a:focus-visible {
 
 .zero-ui-touchpad {
   position: relative;
-  min-height: 330px;
-  padding: 56px 24px 28px;
+  min-height: max(620px, calc(100dvh - 150px));
+  padding: 120px 28px 150px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -497,14 +486,49 @@ a:focus-visible {
   cursor: pointer;
   user-select: none;
   overscroll-behavior: contain;
+  touch-action: none;
   transition: border-color 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.zero-ui-touchpad > * {
+  pointer-events: none;
+}
+
+.zero-ui-touchpad.camera-ready .camera-feed {
+  opacity: 1;
 }
 
 .zero-ui-touchpad:hover {
   border-color: var(--primary);
 }
 
+.preview-status {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  left: 16px;
+  max-width: min(70%, 560px);
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(7, 22, 15, 0.88);
+}
+
+.preview-status .flow-kicker {
+  color: #8ff0c4;
+}
+
+.preview-status h2 {
+  margin: 0;
+  color: #fff;
+  font-family: "Noto Serif KR", serif;
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
 .touchpad-core {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -513,38 +537,26 @@ a:focus-visible {
 
 .microphone-wrapper {
   position: relative;
-  width: 110px;
-  height: 110px;
+  width: 80px;
+  height: 40px;
   display: grid;
   place-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
-.mic-btn {
+.touch-status-indicator {
   position: relative;
   z-index: 2;
-  width: 78px;
-  height: 78px;
-  display: grid;
-  place-items: center;
-  border: 2px solid #7ed8ad;
+  width: 10px;
+  height: 10px;
+  display: block;
   border-radius: 50%;
-  background: #1f3b2d;
-  color: #98efc5;
-  cursor: pointer;
-  transition: background-color 180ms ease-out, transform 120ms ease-out;
+  background: #98efc5;
+  box-shadow: -22px 0 0 #98efc5, 22px 0 0 #98efc5;
 }
 
-.mic-btn span {
-  font-size: 1.5rem;
-}
-
-.mic-btn:hover {
-  background: #28523d;
-}
-
-.mic-btn:active {
-  transform: scale(0.96);
+.touch-status-indicator::after {
+  content: none;
 }
 
 .mic-wave {
@@ -597,6 +609,7 @@ a:focus-visible {
   color: #dff8eb;
   font-size: 0.76rem;
   font-weight: 700;
+  z-index: 2;
 }
 
 .compass-arrow {
@@ -699,11 +712,16 @@ a:focus-visible {
 }
 
 .caption-region {
-  margin-top: 16px;
-  padding: 16px 18px;
-  border: 1px solid #315646;
-  border-radius: var(--radius-md);
-  background: #0c1711;
+  position: absolute;
+  z-index: 2;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-sm);
+  background: rgba(7, 22, 15, 0.9);
 }
 
 .caption-label {
@@ -724,6 +742,39 @@ a:focus-visible {
 .gesture-help {
   margin-top: 14px;
   border-top: 1px solid var(--line);
+}
+
+.fallback-controls {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.fallback-controls > summary {
+  padding: 12px 14px;
+  color: var(--primary-strong);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.fallback-controls-body {
+  padding: 0 14px 14px;
+}
+
+.fallback-controls .voice-control {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.fallback-controls .gesture-help {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .gesture-help summary {
@@ -1353,28 +1404,34 @@ a:focus-visible {
 
 @media (max-width: 640px) {
   .app-header {
-    padding-top: max(10px, env(safe-area-inset-top));
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+    min-height: 58px;
+    padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+    gap: 8px;
   }
 
-  .brand {
-    justify-content: center;
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
   }
 
-  .role-navigation {
-    width: 100%;
+  .brand strong {
+    font-size: 1rem;
   }
 
-  .role-tab {
-    min-width: 0;
-    flex: 1;
+  .brand small {
+    display: none;
+  }
+
+  .role-link {
+    min-height: 40px;
+    padding: 8px;
+    font-size: 0.78rem;
   }
 
   .assist-view,
   .contribute-view {
-    padding: 18px 12px calc(28px + env(safe-area-inset-bottom));
+    padding: 6px 6px calc(20px + env(safe-area-inset-bottom));
   }
 
   .journey-progress {
@@ -1396,7 +1453,7 @@ a:focus-visible {
 
   .companion-panel,
   .demo-panel {
-    padding: 18px;
+    padding: 0;
     box-shadow: none;
   }
 
@@ -1416,13 +1473,44 @@ a:focus-visible {
     border-top: 1px solid var(--line);
   }
 
-  .language-status {
-    margin-top: 16px;
+  .zero-ui-touchpad {
+    min-height: max(620px, calc(100dvh - 76px));
+    padding: 112px 14px 150px;
   }
 
-  .zero-ui-touchpad {
-    min-height: 300px;
-    padding-inline: 16px;
+  .preview-status {
+    top: 10px;
+    left: 10px;
+    max-width: calc(100% - 110px);
+    padding: 10px;
+  }
+
+  .preview-status h2 {
+    font-size: 1rem;
+  }
+
+  .preview-status .language-status {
+    min-height: 30px;
+    margin-top: 8px;
+    padding: 5px 8px;
+  }
+
+  .aim-compass {
+    top: 10px;
+    right: 10px;
+    max-width: 92px;
+  }
+
+  .caption-region {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    padding: 10px;
+  }
+
+  .subtitle-content {
+    font-size: 0.9rem;
+    line-height: 1.45;
   }
 
   .flow-actions {
