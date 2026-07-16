@@ -52,21 +52,15 @@ flowchart TD
 
 Echo-Menu 3.0은 구글 클라우드(GCP)의 고성능 서버리스 기술 및 제미나이 멀티모달 비전 AI 모델을 결합하여 밀리초(ms) 단위의 반응 속도를 확보할 수 있도록 설계되었습니다.
 
-```mermaid
-graph TD
-    User([시각장애인 사용자 / 기여자]) -->|1. 모바일 마이크 / 카메라 촬영 API| CloudRun[Google Cloud Run <br> asia-northeast3]
-    
-    subgraph GCP["Google Cloud Platform (Seoul Region)"]
-        CloudRun -->|클라이언트 에셋 서빙| Frontend[React / Vite + TS Frontend]
-        CloudRun -->|수행 지표 및 처리 로그 적재| BigQuery[(Google BigQuery)]
-        CloudRun -.->|실제 연동용 NoSQL| Firestore[(Cloud Firestore)]
-        CloudRun -->|개발 및 빠른 로컬 캐시 데모| LocalDB[(db_cache.json)]
-    end
-
-    subgraph External_AI_Engine
-        CloudRun -->|손끝 추적 & 메뉴 실시간 조향 지시| Gemini[Gemini API <br> gemini-2.5-flash]
-    end
-```
+| 구성 요소 | 역할 |
+| --- | --- |
+| 사용자 모바일 브라우저 | 마이크 및 카메라 입력을 Cloud Run으로 전송 |
+| Google Cloud Run (`asia-northeast3`) | 프론트엔드 에셋과 API를 제공하는 서버리스 애플리케이션 |
+| React / Vite + TypeScript Frontend | 사용자 및 기여자 웹 인터페이스 제공 |
+| Google BigQuery | 수행 지표와 처리 로그 적재 |
+| Cloud Firestore | 실제 서비스용 NoSQL 데이터 저장소 |
+| `db_cache.json` | 개발 및 빠른 로컬 데모용 캐시 |
+| Gemini API (`gemini-2.5-flash`) | 손끝 추적과 메뉴 실시간 조향 지시 생성 |
 
 ---
 
