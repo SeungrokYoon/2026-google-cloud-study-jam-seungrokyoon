@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function installBrowserStubs(page: Page) {
+async function installBrowserStubs(page: Page, savedLanguage?: string) {
   await page.route("**/api/venue-assist", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -11,14 +11,18 @@ async function installBrowserStubs(page: Page) {
     })
   }));
 
-  await page.addInitScript(() => {
+  await page.addInitScript(({ savedLanguage }) => {
     localStorage.clear();
+    if (savedLanguage) localStorage.setItem("user_language", savedLanguage);
+
+    (window as any).__spokenUtterances = [];
 
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,
       value: {
         cancel() {},
         speak(utterance: SpeechSynthesisUtterance) {
+          (window as any).__spokenUtterances.push({ text: utterance.text, lang: utterance.lang });
           window.setTimeout(() => utterance.onend?.({} as SpeechSynthesisEvent), 0);
         }
       }
@@ -78,7 +82,7 @@ async function installBrowserStubs(page: Page) {
 
     (window as any).SpeechRecognition = RecognitionMock;
     (window as any).webkitSpeechRecognition = RecognitionMock;
-  });
+  }, { savedLanguage });
 }
 
 async function doubleTapTouchpad(page: Page, xRatio = 0.5, yRatio = 0.5) {
@@ -90,6 +94,85 @@ async function doubleTapTouchpad(page: Page, xRatio = 0.5, yRatio = 0.5) {
   await page.waitForTimeout(90);
   await page.touchscreen.tap(x, y);
 }
+
+async function longPressTouchpad(page: Page) {
+  const box = await page.locator("#zero-ui-touchpad").boundingBox();
+  if (!box) throw new Error("터치패드 위치를 찾지 못했습니다.");
+
+  await page.evaluate(async ({ x, y }) => {
+    const target = document.getElementById("zero-ui-touchpad")!;
+    const touch = new Touch({
+      identifier: 1,
+      target,
+      clientX: x,
+      clientY: y,
+      pageX: x,
+      pageY: y
+    });
+    target.dispatchEvent(new TouchEvent("touchstart", {
+      bubbles: true,
+      cancelable: true,
+      touches: [touch],
+      targetTouches: [touch],
+      changedTouches: [touch]
+    }));
+    await new Promise((resolve) => window.setTimeout(resolve, 1100));
+    target.dispatchEvent(new TouchEvent("touchend", {
+      bubbles: true,
+      cancelable: true,
+      touches: [],
+      targetTouches: [],
+      changedTouches: [touch]
+    }));
+  }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+}
+
+test("서비스 진입 직후 7개 언어 안내를 순서대로 재생한다", async ({ page }) => {
+  await installBrowserStubs(page);
+  await page.clock.install();
+  await page.goto("/");
+  await page.clock.runFor(1);
+
+  const expectedLanguages = [
+    { label: "한국어", locale: "ko-KR" },
+    { label: "English", locale: "en-US" },
+    { label: "中文", locale: "zh-CN" },
+    { label: "日本語", locale: "ja-JP" },
+    { label: "Русский", locale: "ru-RU" },
+    { label: "Deutsch", locale: "de-DE" },
+    { label: "العربية", locale: "ar-SA" }
+  ];
+
+  for (const [index, expected] of expectedLanguages.entries()) {
+    await expect(page.locator("#current-language-label")).toHaveText(expected.label);
+    const currentUtterance = await page.evaluate(() => (window as any).__spokenUtterances.at(-1));
+    expect(currentUtterance.lang).toBe(expected.locale);
+    if (index < expectedLanguages.length - 1) await page.clock.runFor(3501);
+  }
+});
+
+test("저장된 언어가 있어도 7개 언어 안내부터 시작하고 길게 눌러 다시 듣는다", async ({ page }) => {
+  await installBrowserStubs(page, "en");
+  await page.goto("/");
+
+  await expect(page.locator("#flow-title")).toHaveText("안내 언어를 듣고 있습니다");
+  await expect(page.locator("#current-language-label")).toHaveText("한국어");
+  await expect.poll(async () => page.evaluate(() => (window as any).__spokenUtterances.length)).toBeGreaterThan(0);
+
+  const firstPrompt = await page.evaluate(() => (window as any).__spokenUtterances[0]);
+  expect(firstPrompt.lang).toBe("ko-KR");
+  expect(firstPrompt.text).toContain("한국어");
+
+  const spokenCount = await page.evaluate(() => (window as any).__spokenUtterances.length);
+  await longPressTouchpad(page);
+  await expect.poll(async () => page.evaluate(() => (window as any).__spokenUtterances.length)).toBeGreaterThan(spokenCount);
+  const replayedPrompt = await page.evaluate(() => (window as any).__spokenUtterances.at(-1));
+  expect(replayedPrompt).toEqual(firstPrompt);
+
+  await doubleTapTouchpad(page);
+  await expect(page.locator("#permission-choice-surface")).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("user_language"))).toBe("ko");
+});
 
 test("모바일 주문 흐름을 화면 전체 제스처로 완료한다", async ({ page }) => {
   await installBrowserStubs(page);
@@ -108,9 +191,6 @@ test("모바일 주문 흐름을 화면 전체 제스처로 완료한다", async
   expect(touchpadBox!.height).toBeGreaterThanOrEqual(560);
 
   await doubleTapTouchpad(page, 0.12, 0.18);
-  await expect(page.locator("#flow-primary-action")).toHaveText("이 언어로 계속");
-  await doubleTapTouchpad(page);
-
   await expect(page.locator("#permission-choice-surface")).toBeVisible();
   expect(await page.evaluate(() => (window as any).__getUserMediaCalls || 0)).toBe(0);
   await page.touchscreen.tap(24, 180);
@@ -146,7 +226,6 @@ test("권한 선택에서 화면 두 번 탭은 마이크와 카메라 요청을
   await page.goto("/");
 
   await doubleTapTouchpad(page);
-  await doubleTapTouchpad(page);
   await expect(page.locator("#permission-choice-surface")).toBeVisible();
 
   await page.touchscreen.tap(30, 190);
@@ -166,7 +245,7 @@ test("마이크 캡처 실패 원인을 구체적인 음성 안내로 구분한�
   await page.evaluate(() => { (window as any).__speechError = "audio-capture"; });
 
   await doubleTapTouchpad(page);
-  await doubleTapTouchpad(page);
+  await expect(page.locator("#permission-choice-surface")).toBeVisible();
   await page.touchscreen.tap(24, 180);
 
   await expect(page.locator("#subtitle-box")).toContainText("다른 앱이 마이크를 사용 중인지 확인", { timeout: 10_000 });
