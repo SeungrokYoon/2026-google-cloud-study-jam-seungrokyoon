@@ -12,6 +12,10 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(path.join(__dirname, "dist")));
+app.get("/contribute", (_req, res) => {
+  res.sendFile(path.join(__dirname, "dist", "contribute.html"));
+});
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
 
 // Gemini API Key 검증 및 SDK 초기화
 const apiKey = process.env.GCLOUD_API_KEY || process.env.GEMINI_API_KEY;
