@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Echo-Menu 3.0: Zero-Software Kiosk Audio-Haptic Guide</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- 1. LEFT SIDE: 가상 키오스크 디스플레이 (스타벅스 / 맥도날드 에뮬레이터) -->
+    <div class="kiosk-emulator-panel">
+      <div class="panel-header">
+        <span class="pulse-indicator"></span>
+        <h2>실물 키오스크 시뮬레이터 (Kiosk Simulator)</h2>
+        <div class="kiosk-selector">
+          <button id="btn-kiosk-starbucks" class="active">☕ 스타벅스</button>
+          <button id="btn-kiosk-mcdonalds">🍔 맥도날드</button>
+        </div>
+      </div>
+      
+      <div class="kiosk-display-viewport" id="kiosk-viewport">
+        <!-- 키오스크 탑바 -->
+        <div class="kiosk-top-bar">
+          <h1 id="kiosk-store-name">스타벅스 신라호텔점</h1>
+          <span id="kiosk-time">02:00 PM</span>
+        </div>
+        
+        <!-- 키오스크 동적 뷰포트 본체 -->
+        <div class="kiosk-screen-content" id="kiosk-screen-content">
+          <!-- 1단계: 시작 화면 -->
+          <div class="kiosk-step" id="kiosk-step-start">
+            <div class="kiosk-start-hero">
+              <div class="start-logo">🟢</div>
+              <h2>반갑습니다. 스타벅스입니다.</h2>
+              <p>주문을 시작하려면 화면 하단의 버튼을 눌러주세요.</p>
+              <button class="kiosk-big-action-btn" id="kiosk-start-btn">주문하기 (Touch to Order)</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 실물 카드 삽입구 모사 영역 (하드웨어 가이드용) -->
+        <div class="kiosk-hardware-bar">
+          <div class="card-slot-mocker" id="card-slot-mock">
+            <span class="slot-light"></span>
+            <span class="slot-text">💳 CARD INSERT HERE (카드 투입구)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. RIGHT SIDE: 모바일 햅틱 뷰 & 배리어프리 제어 (Zero-UI 및 대시보드) -->
+    <div class="haptic-control-panel">
+      <div class="panel-header">
+        <h2>모바일 배리어프리 에이전트 (Echo-Menu)</h2>
+        <div class="accessibility-mode-selector">
+          <label class="switch">
+            <input type="checkbox" id="toggle-voice-on" checked>
+            <span class="slider round"></span>
+          </label>
+          <span class="mode-label">음성 피드백 ON/OFF</span>
+        </div>
+      </div>
+
+      <!-- 모바일 Zero-UI 조작 영역 (시각장애인용 마이크 제스처 제어판) -->
+      <div class="zero-ui-touchpad" id="zero-ui-touchpad">
+        <div class="microphone-wrapper">
+          <div class="mic-wave" id="mic-wave-effect"></div>
+          <button class="mic-btn" id="mic-activation-btn">🎤</button>
+        </div>
+        <p class="haptic-instruction" id="haptic-instruction-text">화면을 더블 탭(Double Tap)하여<br>음성 인식을 켜고 명령을 내리세요</p>
+        
+        <!-- 3D 오디오 조향 방향 나침반 시각화 (시연 검증용) -->
+        <div class="aim-compass" id="aim-compass-view">
+          <div class="compass-arrow" id="compass-arrow-ptr">➔</div>
+          <div class="compass-label" id="compass-label-text">조준 대기 중</div>
+        </div>
+      </div>
+
+      <!-- 실시간 자막 오버레이 영역 (청각장애인 및 고령층 보조용) -->
+      <div class="subtitles-viewport">
+        <div class="subtitle-label">실시간 자막 및 행동 코칭 가이드</div>
+        <div class="subtitle-content" id="subtitle-box">
+          반갑습니다. 소리메뉴입니다. 음성 도움이 필요하십니까? 화면을 더블 탭(음성 모드)하거나 길게 눌러(자막 모드) 선택하세요.
+        </div>
+      </div>
+
+      <!-- 기여하기 및 명예의 전당 대시보드 토글러 -->
+      <div class="contributions-panel">
+        <div class="tab-selectors">
+          <button id="tab-btn-leaderboard" class="active">🏆 명예의 전당</button>
+          <button id="tab-btn-contribute">🌱 배리어프리 기여하기</button>
+        </div>
+
+        <div class="tab-contents">
+          <!-- 1. 리더보드 탭 -->
+          <div class="tab-pane active" id="pane-leaderboard">
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>기여자 명</th>
+                    <th>기여 포인트</th>
+                    <th>사용 횟수</th>
+                    <th>갱신 횟수</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-tbody">
+                  <!-- JS로 채워짐 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 2. 기여하기 탭 -->
+          <div class="tab-pane" id="pane-contribute">
+            <div class="contribution-form">
+              <h3>매장 소리메뉴 기여하기 (일반인 공헌)</h3>
+              <p class="form-desc">새로운 키오스크 화면이나 메뉴판 사진을 찍어 올리시면 배리어프리 AI 정보로 갱신되고 포인트가 누적됩니다.</p>
+              <div class="input-group" style="display:flex; flex-direction:column; gap:5px;">
+                <input type="text" id="contrib-username" placeholder="기여자 닉네임 입력">
+                <!-- 구글 맵 GPS 내 주변 매장 드롭다운 추천 연동 -->
+                <div style="display:flex; gap:5px; width:100%;">
+                  <select id="contrib-gps-venues" style="flex:2; padding:8px; border-radius:6px; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-color); font-size:0.8rem; outline:none;">
+                    <option value="">🗺️ [추천] 내 위치 주변 매장 검색...</option>
+                  </select>
+                  <button id="btn-gps-refresh" type="button" style="flex:1; background:var(--bg-card); border:1px solid var(--border-color); color:var(--text-secondary); border-radius:6px; font-size:0.75rem; cursor:pointer;">📍 현재위치</button>
+                </div>
+                <input type="text" id="contrib-venue" placeholder="🗺️ 장소 찾기 검색 (예: 스타벅스 강남...)">
+                <!-- 구글 맵 Autocomplete 검색 결과 목록 드롭다운 홀더 -->
+                <div id="contrib-search-results" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:6px; max-height:120px; overflow-y:auto; display:none; margin-top:2px;"></div>
+              </div>
+              <!-- 미니 구글 맵 캔버스 홀더 -->
+              <div id="contrib-map-canvas" style="height: 80px; width: 100%; margin-top: 5px; border-radius: 8px; border: 1px solid var(--border-color); display: none;"></div>
+              <button class="contrib-submit-btn" id="btn-submit-contribution" style="margin-top:5px;">📸 사진 찍어 기여하기 (150pt 적립)</button>
+              <div class="contrib-status-msg" id="contrib-status-msg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script type="module" src="/app.ts"></script>
+</body>
+</html>
