@@ -8,7 +8,8 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, "public/index.html")
+        main: resolve(__dirname, "public/index.html"),
+        contribute: resolve(__dirname, "public/contribute.html")
       }
     }
   },

@@ -54,7 +54,6 @@ const compassArrowPtr = document.getElementById("compass-arrow-ptr") as HTMLElem
 const compassLabelText = document.getElementById("compass-label-text") as HTMLElement;
 const zeroUiTouchpad = document.getElementById("zero-ui-touchpad") as HTMLElement;
 const cameraFeed = document.getElementById("camera-feed") as HTMLVideoElement;
-const micActivationBtn = document.getElementById("mic-activation-btn") as HTMLButtonElement;
 const flowKicker = document.getElementById("flow-kicker") as HTMLElement;
 const flowTitle = document.getElementById("flow-title") as HTMLElement;
 const flowDescription = document.getElementById("flow-description") as HTMLElement;
@@ -64,17 +63,7 @@ const currentLanguageLabel = document.getElementById("current-language-label") a
 const languageStatus = document.getElementById("language-status") as HTMLElement;
 const venueFallbackForm = document.getElementById("venue-fallback-form") as HTMLFormElement;
 const manualVenueName = document.getElementById("manual-venue-name") as HTMLInputElement;
-const navAssist = document.getElementById("nav-assist") as HTMLButtonElement;
-const navContribute = document.getElementById("nav-contribute") as HTMLButtonElement;
-const assistView = document.getElementById("assist-view") as HTMLElement;
-const contributeView = document.getElementById("contribute-view") as HTMLElement;
 const permissionChoiceSurface = document.getElementById("permission-choice-surface") as HTMLElement;
-
-const tabLeaderboard = document.getElementById("tab-btn-leaderboard") as HTMLButtonElement;
-const tabContribute = document.getElementById("tab-btn-contribute") as HTMLButtonElement;
-const paneLeaderboard = document.getElementById("pane-leaderboard") as HTMLElement;
-const paneContribute = document.getElementById("pane-contribute") as HTMLElement;
-const leaderboardTbody = document.getElementById("leaderboard-tbody") as HTMLTableSectionElement;
 
 type JourneyStep = "language" | "permission" | "venue" | "menu" | "payment";
 
@@ -112,15 +101,6 @@ function setJourneyStep(
   venueFallbackForm.hidden = !options.showVenueInput;
 }
 
-function showAppView(view: "assist" | "contribute") {
-  const showAssist = view === "assist";
-  assistView.hidden = !showAssist;
-  contributeView.hidden = showAssist;
-  navAssist.classList.toggle("active", showAssist);
-  navContribute.classList.toggle("active", !showAssist);
-  navAssist.setAttribute("aria-pressed", String(showAssist));
-  navContribute.setAttribute("aria-pressed", String(!showAssist));
-}
 // 다국어 딕셔너리 리소스 (Static Localization - 7개국어 확장)
 const locales: any = {
   ko: {
@@ -368,8 +348,6 @@ function captureVenueAnswer() {
 
 // 최초 진입 시 음성 온보딩 실행
 window.addEventListener("DOMContentLoaded", () => {
-  loadLeaderboard();
-
   // 브라우저 로컬 저장소 확인
   const savedLang = localStorage.getItem("user_language");
   if (savedLang && locales[savedLang]) {
@@ -422,7 +400,6 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   flowPrimaryAction.addEventListener("click", handleTouchpadDoubleTap);
-  micActivationBtn.addEventListener("click", handleTouchpadDoubleTap);
   repeatGuidanceBtn.addEventListener("click", () => {
     if (pendingVenueAnswer) {
       pendingVenueAnswer = null;
@@ -443,9 +420,6 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     handleVenueIdentification(venueName);
   });
-
-  navAssist.addEventListener("click", () => showAppView("assist"));
-  navContribute.addEventListener("click", () => showAppView("contribute"));
 });
 
 let isPermissionRequested = false;
@@ -514,9 +488,12 @@ function registerPermissionTap() {
   permissionTapTimer = window.setTimeout(() => resolvePermissionChoice(true), 360);
 }
 
-permissionChoiceSurface.addEventListener("pointerup", registerPermissionTap);
-permissionChoiceSurface.addEventListener("click", (event) => {
-  if (event.detail === 0) resolvePermissionChoice(true);
+permissionChoiceSurface.addEventListener("touchend", (event) => {
+  event.preventDefault();
+  registerPermissionTap();
+}, { passive: false });
+permissionChoiceSurface.addEventListener("pointerup", (event) => {
+  if (event.pointerType !== "touch") registerPermissionTap();
 });
 permissionChoiceSurface.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
@@ -579,7 +556,12 @@ function initAccessibilityPermissions() {
       stream.getAudioTracks().forEach((track) => track.stop());
       cameraStream = videoTracks.length > 0 ? new MediaStream(videoTracks) : stream;
       cameraFeed.srcObject = cameraStream;
-      void cameraFeed.play().catch(() => undefined);
+      cameraFeed.addEventListener("loadeddata", () => {
+        zeroUiTouchpad.classList.add("camera-ready");
+      }, { once: true });
+      void cameraFeed.play()
+        .then(() => zeroUiTouchpad.classList.add("camera-ready"))
+        .catch(() => undefined);
 
       const successNotice = pLocale.permissionSuccess;
       flowPrimaryAction.disabled = false;
@@ -1246,7 +1228,13 @@ function hapticSteer(pattern: string) {
 
 // iOS 진동 미지원 대응용 비주얼 햅틱 플래시 헬퍼
 function triggerVisualHapticFlash(pattern: string) {
-  zeroUiTouchpad.className = "zero-ui-touchpad"; // 클래스 리셋 (기존 스타일 유지)
+  zeroUiTouchpad.classList.remove(
+    "haptic-pulse-right",
+    "haptic-pulse-left",
+    "haptic-pulse-up",
+    "haptic-pulse-down",
+    "haptic-pulse-center"
+  );
 
   // 리팩토링된 햅틱 클래스 매핑
   const flashClass = `haptic-pulse-${pattern}`;
@@ -1836,246 +1824,5 @@ window.addEventListener("pagehide", () => {
 });
 
 // --------------------------------------------------
-// 6. Contributor Dashboard & Leaderboard (게이미피케이션)
-// --------------------------------------------------
-function loadLeaderboard() {
-  fetch("/api/leaderboard")
-    .then(res => res.json())
-    .then(list => {
-      leaderboardTbody.innerHTML = "";
-      list.forEach((item: any) => {
-        let dinoIcon = "🥚";
-        if (item.points > 1200) dinoIcon = "👑🦖";
-        else if (item.points > 800) dinoIcon = "🦅";
-        else if (item.points > 400) dinoIcon = "🦖";
-        else if (item.points > 100) dinoIcon = "🦕";
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td><strong>${item.rank}위</strong></td>
-          <td>${dinoIcon} ${item.username}</td>
-          <td><span style="color:var(--accent-green); font-weight:700;">${item.points} pt</span></td>
-          <td>${item.views} 회</td>
-          <td>${item.updates} 회</td>
-        `;
-        leaderboardTbody.appendChild(tr);
-      });
-    });
-}
-
-const contributionForm = document.getElementById("contribution-form") as HTMLFormElement;
-const contribUsername = document.getElementById("contrib-username") as HTMLInputElement;
-const contribVenue = document.getElementById("contrib-venue") as HTMLInputElement;
-const contribStatusMsg = document.getElementById("contrib-status-msg") as HTMLElement;
-
-contributionForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const username = contribUsername.value.trim();
-  const venueName = contribVenue.value.trim();
-
-  if (!username || !venueName) {
-    contribStatusMsg.textContent = "⚠️ 닉네임과 매장명을 입력하세요.";
-    return;
-  }
-
-  fetch("/api/contribute", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, venueName })
-  })
-  .then(res => res.json())
-  .then(resData => {
-    contribStatusMsg.textContent = `🎉 기여 성공! ${resData.data.points}pt 누적됨.`;
-    contribUsername.value = "";
-    contribVenue.value = "";
-    loadLeaderboard();
-    setTimeout(() => { contribStatusMsg.textContent = ""; }, 3000);
-  });
-});
-
-tabLeaderboard.addEventListener("click", () => {
-  tabLeaderboard.classList.add("active");
-  tabContribute.classList.remove("active");
-  paneLeaderboard.classList.add("active");
-  paneContribute.classList.remove("active");
-  tabLeaderboard.setAttribute("aria-selected", "true");
-  tabContribute.setAttribute("aria-selected", "false");
-});
-tabContribute.addEventListener("click", () => {
-  tabContribute.classList.add("active");
-  tabLeaderboard.classList.remove("active");
-  paneContribute.classList.add("active");
-  paneLeaderboard.classList.remove("active");
-  tabContribute.setAttribute("aria-selected", "true");
-  tabLeaderboard.setAttribute("aria-selected", "false");
-});
-
-// --------------------------------------------------
-// 7. Google Maps & Geolocation API 기여 연동
-// --------------------------------------------------
-const btnGpsRefresh = document.getElementById("btn-gps-refresh") as HTMLButtonElement;
-const contribGpsVenues = document.getElementById("contrib-gps-venues") as HTMLSelectElement;
-const contribMapCanvas = document.getElementById("contrib-map-canvas") as HTMLElement;
-
-btnGpsRefresh.addEventListener("click", () => {
-  if (!("geolocation" in navigator)) {
-    contribStatusMsg.textContent = "이 브라우저는 위치 검색을 지원하지 않습니다. 매장 이름을 직접 입력하세요.";
-    return;
-  }
-
-  btnGpsRefresh.textContent = "검색 중…";
-  btnGpsRefresh.disabled = true;
-  navigator.geolocation.getCurrentPosition((position) => {
-    const lat = position.coords.latitude;
-    const lng = position.coords.longitude;
-
-    console.log(`📍 현재 위치 감지: ${lat}, ${lng}`);
-
-    // 구글 Places API 연동 흉내내기 (내 위치 주변의 등록된 매장 목록 추천 빌드)
-    const mockNearbyPlaces = [
-      { name: "스타벅스 신라호텔점", address: "서울특별시 중구 동호로 249", placeId: "chIJs234" },
-      { name: "맥도날드 홍대점", address: "서울특별시 마포구 양화로 160", placeId: "chIJmc45" },
-      { name: "스타벅스 홍대역점", address: "서울특별시 마포구 양화로 165", placeId: "chIJsb99" },
-      { name: "스타벅스 신촌역점", address: "서울특별시 서대문구 신촌로 110", placeId: "chIJsb88" }
-    ];
-
-    // 드롭다운 채우기
-    contribGpsVenues.innerHTML = '<option value="">🗺️ [추천] 내 위치 주변 매장 선택...</option>';
-    mockNearbyPlaces.forEach(place => {
-      const opt = document.createElement("option");
-      opt.value = place.name;
-      opt.setAttribute("data-address", place.address);
-      opt.setAttribute("data-place-id", place.placeId);
-      opt.textContent = `${place.name} (${place.address.substring(6, 15)}...)`;
-      contribGpsVenues.appendChild(opt);
-    });
-
-    btnGpsRefresh.textContent = "주변 매장 다시 찾기";
-    btnGpsRefresh.disabled = false;
-    contribStatusMsg.textContent = "내 주변 매장을 불러왔습니다.";
-    setTimeout(() => { contribStatusMsg.textContent = ""; }, 2000);
-  }, () => {
-    btnGpsRefresh.textContent = "현재 위치로 찾기";
-    btnGpsRefresh.disabled = false;
-    contribStatusMsg.textContent = "위치를 가져올 수 없습니다. 위치 권한을 확인하거나 매장 이름을 직접 입력하세요.";
-  });
-});
-
-contribGpsVenues.addEventListener("change", (e: any) => {
-  const selectedName = e.target.value;
-  if (!selectedName) {
-    contribMapCanvas.hidden = true;
-    return;
-  }
-
-  contribVenue.value = selectedName;
-  contribMapCanvas.hidden = false;
-  renderMiniGoogleMap(selectedName);
-});
-
-// --------------------------------------------------
-// Google Maps Autocomplete 장소 찾기 검색 연동
-// --------------------------------------------------
-const contribSearchResults = document.getElementById("contrib-search-results") as HTMLElement;
-
-contribVenue.addEventListener("input", (e: any) => {
-  const query = e.target.value.trim();
-  if (query.length < 2) {
-    contribSearchResults.hidden = true;
-    return;
-  }
-
-  // 구글 맵 Autocomplete API 결과 데이터 모사 (검색 쿼리 매칭)
-  const mockDb = [
-    { name: "스타벅스 강남대로점", address: "서울특별시 강남구 강남대로 390" },
-    { name: "스타벅스 강남삼성타운점", address: "서울특별시 강남구 서초대로78길 24" },
-    { name: "스타벅스 강남역점", address: "서울특별시 강남구 테헤란로 105" },
-    { name: "맥도날드 강남점", address: "서울특별시 강남구 테헤란로 111" },
-    { name: "맥도날드 신촌점", address: "서울특별시 서대문구 신촌로 99" }
-  ];
-
-  const matched = mockDb.filter(place => place.name.includes(query) || place.address.includes(query));
-
-  if (matched.length === 0) {
-    contribSearchResults.hidden = true;
-    return;
-  }
-
-  contribSearchResults.innerHTML = "";
-  contribSearchResults.hidden = false;
-
-  matched.forEach(place => {
-    const option = document.createElement("button");
-    option.type = "button";
-    option.className = "search-result-option";
-    option.setAttribute("role", "option");
-    option.innerHTML = `<strong>${place.name}</strong><span>${place.address}</span>`;
-
-    option.addEventListener("click", () => {
-      contribVenue.value = place.name;
-      contribSearchResults.hidden = true;
-      contribMapCanvas.hidden = false;
-      renderMiniGoogleMap(place.name);
-    });
-
-    contribSearchResults.appendChild(option);
-  });
-});
-
-// 클릭 시 Autocomplete 창 닫기 바인딩
-document.addEventListener("click", (e: any) => {
-  if (e.target !== contribVenue && !contribSearchResults.contains(e.target)) {
-    contribSearchResults.hidden = true;
-  }
-});
-
-function renderMiniGoogleMap(venueName: string) {
-  contribMapCanvas.innerHTML = "";
-
-  // 가상 지도 핀 드로잉 Canvas 생성
-  const mapCanvas = document.createElement("canvas");
-  mapCanvas.width = 400;
-  mapCanvas.height = 80;
-  const ctx = mapCanvas.getContext("2d") as CanvasRenderingContext2D;
-
-  // 지도 배경 그리드 그리기
-  ctx.fillStyle = "#e2e8f0";
-  ctx.fillRect(0, 0, 400, 80);
-
-  ctx.strokeStyle = "#cbd5e1";
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 400; i += 20) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, 80);
-    ctx.stroke();
-  }
-  for (let j = 0; j < 80; j += 20) {
-    ctx.beginPath();
-    ctx.moveTo(0, j);
-    ctx.lineTo(400, j);
-    ctx.stroke();
-  }
-
-  // 붉은색 구글 핀 마커 그리기
-  ctx.fillStyle = "#ef4444";
-  ctx.beginPath();
-  ctx.arc(200, 30, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(192, 30);
-  ctx.lineTo(200, 48);
-  ctx.lineTo(208, 30);
-  ctx.fill();
-
-  // 매장 텍스트 라벨 렌더링
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "bold 11px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(`📍 ${venueName}`, 200, 68);
-
-  contribMapCanvas.appendChild(mapCanvas);
-}
-
+// Seed the hidden kiosk state used by the ordering flow.
 initVenue("starbucks");

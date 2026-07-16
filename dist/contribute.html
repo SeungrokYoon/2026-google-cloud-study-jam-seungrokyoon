@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f7f5">
+  <meta name="description" content="Echo Menu 키오스크 메뉴 정보 기여">
+  <title>메뉴 정보 기여 | Echo Menu</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/contribute-HLt0etb4.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/style-Cxw5r-Ng.js">
+  <link rel="stylesheet" crossorigin href="/assets/style-zQ6lCm8X.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">주요 내용으로 이동</a>
+
+  <header class="app-header">
+    <a class="brand" href="/" aria-label="Echo Menu 주문 도우미로 돌아가기">
+      <span class="brand-mark" aria-hidden="true">E</span>
+      <span>
+        <strong>Echo Menu</strong>
+        <small>메뉴 정보 기여</small>
+      </span>
+    </a>
+    <a class="role-link" href="/">주문 도움으로 돌아가기</a>
+  </header>
+
+  <main id="main-content" class="contribute-view">
+    <section aria-labelledby="contribute-title">
+      <div class="contribute-intro">
+        <p>함께 만드는 접근성 데이터</p>
+        <h1 id="contribute-title">키오스크 메뉴 정보를 기여하세요</h1>
+        <span>매장과 메뉴판을 등록하면 다음 사용자의 주문 시간이 짧아집니다.</span>
+      </div>
+
+      <div class="contribution-workspace">
+        <div class="tab-selectors" role="tablist" aria-label="기여 화면">
+          <button id="tab-btn-contribute" class="active" type="button" role="tab" aria-selected="true" aria-controls="pane-contribute">메뉴 정보 기여</button>
+          <button id="tab-btn-leaderboard" type="button" role="tab" aria-selected="false" aria-controls="pane-leaderboard">기여 현황</button>
+        </div>
+
+        <div class="tab-contents">
+          <div class="tab-pane active" id="pane-contribute" role="tabpanel" aria-labelledby="tab-btn-contribute">
+            <form class="contribution-form" id="contribution-form">
+              <div class="form-field">
+                <label for="contrib-username">기여자 이름</label>
+                <input type="text" id="contrib-username" name="username" autocomplete="nickname" placeholder="표시할 이름" required>
+              </div>
+
+              <div class="form-field">
+                <label for="contrib-gps-venues">주변 매장</label>
+                <div class="field-with-action">
+                  <select id="contrib-gps-venues" name="nearby_venue">
+                    <option value="">주변 매장을 먼저 검색하세요</option>
+                  </select>
+                  <button id="btn-gps-refresh" class="secondary-action" type="button">현재 위치로 찾기</button>
+                </div>
+              </div>
+
+              <div class="form-field">
+                <label for="contrib-venue">매장 이름 또는 주소</label>
+                <input type="search" id="contrib-venue" name="venue" autocomplete="off" placeholder="예: 스타벅스 강남역점" required>
+              </div>
+
+              <button class="primary-action" id="btn-submit-contribution" type="submit">메뉴판 사진 등록 · 150pt</button>
+              <div class="contrib-status-msg" id="contrib-status-msg" role="status" aria-live="polite"></div>
+            </form>
+          </div>
+
+          <div class="tab-pane" id="pane-leaderboard" role="tabpanel" aria-labelledby="tab-btn-leaderboard">
+            <div class="leaderboard-table-wrapper">
+              <table class="leaderboard-table">
+                <caption>메뉴 정보 기여 순위</caption>
+                <thead>
+                  <tr><th>순위</th><th>기여자</th><th>포인트</th><th>사용</th><th>갱신</th></tr>
+                </thead>
+                <tbody id="leaderboard-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
+</html>

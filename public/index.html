@@ -23,51 +23,29 @@
       </span>
     </a>
 
-    <nav class="role-navigation" aria-label="서비스 영역">
-      <button id="nav-assist" class="role-tab active" type="button" aria-pressed="true">주문 도움</button>
-      <button id="nav-contribute" class="role-tab" type="button" aria-pressed="false">메뉴 정보 기여</button>
-    </nav>
+    <a id="nav-contribute" class="role-link" href="/contribute">메뉴 정보 기여</a>
   </header>
 
   <main id="main-content">
     <section id="assist-view" class="assist-view" aria-labelledby="assist-title">
       <h1 id="assist-title" class="sr-only">Echo Menu 주문 도움</h1>
 
-      <div class="journey-progress" aria-label="주문 도움 진행 단계">
-        <ol>
-          <li data-journey-step="language" class="active" aria-current="step"><span>1</span>언어</li>
-          <li data-journey-step="permission"><span>2</span>권한</li>
-          <li data-journey-step="venue"><span>3</span>매장</li>
-          <li data-journey-step="menu"><span>4</span>메뉴</li>
-          <li data-journey-step="payment"><span>5</span>결제</li>
-        </ol>
-      </div>
-
       <div class="assist-layout">
         <section class="companion-panel" aria-labelledby="flow-title">
-          <div class="companion-heading">
-            <div>
+          <div class="zero-ui-touchpad" id="zero-ui-touchpad" tabindex="0" role="button" aria-label="화면 전체 제스처 영역. 두 번 탭해 현재 단계를 실행합니다.">
+            <video id="camera-feed" class="camera-feed" autoplay playsinline muted aria-hidden="true"></video>
+
+            <div class="preview-status">
               <p id="flow-kicker" class="flow-kicker">1단계 · 언어 선택</p>
               <h2 id="flow-title">안내 언어를 듣고 있습니다</h2>
-              <p id="flow-description">원하는 언어가 들리면 화면을 두 번 탭하거나 아래 버튼을 누르세요.</p>
+              <p id="flow-description" class="sr-only">원하는 언어가 들리면 화면을 두 번 탭하세요.</p>
+              <div class="language-status" id="language-status">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span>현재 안내</span>
+                <strong id="current-language-label">한국어</strong>
+              </div>
             </div>
 
-            <label class="voice-control" for="toggle-voice-on">
-              <span>음성 안내</span>
-              <span class="switch">
-                <input type="checkbox" id="toggle-voice-on" checked>
-                <span class="slider" aria-hidden="true"></span>
-              </span>
-            </label>
-          </div>
-
-          <div class="language-status" id="language-status">
-            <span class="status-dot" aria-hidden="true"></span>
-            <span>현재 안내</span>
-            <strong id="current-language-label">한국어</strong>
-          </div>
-
-          <div class="zero-ui-touchpad" id="zero-ui-touchpad" tabindex="0" role="application" aria-label="Echo Menu 제스처 터치 영역">
             <div class="aim-compass" id="aim-compass-view" aria-live="polite">
               <span class="compass-arrow" id="compass-arrow-ptr" aria-hidden="true">→</span>
               <span class="compass-label" id="compass-label-text">안내 대기 중</span>
@@ -76,106 +54,51 @@
             <div class="touchpad-core">
               <div class="microphone-wrapper">
                 <div class="mic-wave" id="mic-wave-effect" aria-hidden="true"></div>
-                <button class="mic-btn" id="mic-activation-btn" type="button" aria-label="현재 단계 실행">
-                  <span aria-hidden="true">●</span>
-                </button>
+                <span class="touch-status-indicator" aria-hidden="true"></span>
               </div>
               <p class="haptic-instruction" id="haptic-instruction-text">화면 전체를 두 번 탭해 현재 언어를 선택하세요.</p>
-              <p class="touchpad-note">이 영역은 한 손가락, 두 손가락, 세 손가락 제스처를 인식합니다.</p>
             </div>
+
+            <section class="caption-region" aria-labelledby="caption-label">
+              <div id="caption-label" class="caption-label">현재 음성 안내</div>
+              <div class="subtitle-content" id="subtitle-box" role="status" aria-live="polite" aria-atomic="true">
+                한국어로 말할까요? 원하시면 화면을 두 번 탭해 주세요.
+              </div>
+            </section>
           </div>
 
-          <div class="flow-actions">
-            <button class="primary-action" id="flow-primary-action" type="button">현재 언어 선택</button>
-            <button class="secondary-action" id="repeat-guidance" type="button">안내 다시 듣기</button>
-          </div>
+          <details class="fallback-controls">
+            <summary>대체 조작 열기</summary>
+            <div class="fallback-controls-body">
+              <label class="voice-control" for="toggle-voice-on">
+                <span>음성 안내</span>
+                <span class="switch">
+                  <input type="checkbox" id="toggle-voice-on" checked>
+                  <span class="slider" aria-hidden="true"></span>
+                </span>
+              </label>
 
-          <form id="venue-fallback-form" class="venue-fallback" hidden>
-            <label for="manual-venue-name">매장 이름을 직접 입력</label>
-            <div>
-              <input id="manual-venue-name" name="venue" type="text" autocomplete="off" placeholder="예: 맥도날드 홍대점…">
-              <button type="submit">매장 찾기</button>
+              <div class="flow-actions">
+                <button class="primary-action" id="flow-primary-action" type="button">현재 언어 선택</button>
+                <button class="secondary-action" id="repeat-guidance" type="button">안내 다시 듣기</button>
+              </div>
+
+              <form id="venue-fallback-form" class="venue-fallback" hidden>
+                <label for="manual-venue-name">매장 이름을 직접 입력</label>
+                <div>
+                  <input id="manual-venue-name" name="venue" type="text" autocomplete="off" placeholder="예: 맥도날드 홍대점…">
+                  <button type="submit">매장 찾기</button>
+                </div>
+              </form>
+
+              <div class="gesture-help">
+                <strong>제스처</strong>
+                <span>두 번 탭: 확인 · 한 손가락: 방향 · 두 손가락: 메뉴 읽기 · 세 손가락: 이전 화면 · 다섯 손가락: 일시정지</span>
+              </div>
             </div>
-          </form>
-
-          <section class="caption-region" aria-labelledby="caption-label">
-            <div id="caption-label" class="caption-label">현재 음성 안내</div>
-            <div class="subtitle-content" id="subtitle-box" role="status" aria-live="polite" aria-atomic="true">
-              한국어로 말할까요? 원하시면 화면을 두 번 탭해 주세요.
-            </div>
-          </section>
-
-          <details class="gesture-help">
-            <summary>제스처 안내와 대체 조작</summary>
-            <ul>
-              <li><strong>두 번 탭</strong><span>현재 선택을 확인하거나 다음 단계로 이동</span></li>
-              <li><strong>한 손가락</strong><span>방향음을 따라 목표 버튼으로 이동</span></li>
-              <li><strong>두 손가락</strong><span>손끝 아래 메뉴와 가격 듣기</span></li>
-              <li><strong>세 손가락</strong><span>이전 키오스크 화면으로 이동</span></li>
-              <li><strong>다섯 손가락</strong><span>안내 일시정지 또는 다시 시작</span></li>
-            </ul>
-            <p>제스처 사용이 어려우면 위의 단계 실행 버튼과 매장 직접 입력을 사용하세요.</p>
           </details>
         </section>
 
-      </div>
-    </section>
-
-    <section id="contribute-view" class="contribute-view" aria-labelledby="contribute-title" hidden>
-      <div class="contribute-intro">
-        <p>함께 만드는 접근성 데이터</p>
-        <h1 id="contribute-title">키오스크 메뉴 정보를 기여하세요</h1>
-        <span>매장과 메뉴판을 등록하면 다음 사용자의 주문 시간이 짧아집니다.</span>
-      </div>
-
-      <div class="contribution-workspace">
-        <div class="tab-selectors" role="tablist" aria-label="기여 화면">
-          <button id="tab-btn-contribute" class="active" type="button" role="tab" aria-selected="true" aria-controls="pane-contribute">메뉴 정보 기여</button>
-          <button id="tab-btn-leaderboard" type="button" role="tab" aria-selected="false" aria-controls="pane-leaderboard">기여 현황</button>
-        </div>
-
-        <div class="tab-contents">
-          <div class="tab-pane active" id="pane-contribute" role="tabpanel" aria-labelledby="tab-btn-contribute">
-            <form class="contribution-form" id="contribution-form">
-              <div class="form-field">
-                <label for="contrib-username">기여자 이름</label>
-                <input type="text" id="contrib-username" name="username" autocomplete="nickname" placeholder="표시할 이름…">
-              </div>
-
-              <div class="form-field">
-                <label for="contrib-gps-venues">주변 매장</label>
-                <div class="field-with-action">
-                  <select id="contrib-gps-venues" name="nearby_venue">
-                    <option value="">주변 매장을 먼저 검색하세요</option>
-                  </select>
-                  <button id="btn-gps-refresh" class="secondary-action" type="button">현재 위치로 찾기</button>
-                </div>
-              </div>
-
-              <div class="form-field search-field">
-                <label for="contrib-venue">매장 이름 또는 주소</label>
-                <input type="search" id="contrib-venue" name="venue" autocomplete="off" placeholder="예: 스타벅스 강남역점…" aria-controls="contrib-search-results">
-                <div id="contrib-search-results" class="search-results" role="listbox" hidden></div>
-              </div>
-
-              <div id="contrib-map-canvas" class="map-preview" hidden aria-label="선택한 매장 위치 미리보기"></div>
-              <button class="primary-action" id="btn-submit-contribution" type="submit">메뉴판 사진 등록 · 150pt</button>
-              <div class="contrib-status-msg" id="contrib-status-msg" role="status" aria-live="polite"></div>
-            </form>
-          </div>
-
-          <div class="tab-pane" id="pane-leaderboard" role="tabpanel" aria-labelledby="tab-btn-leaderboard">
-            <div class="leaderboard-table-wrapper">
-              <table class="leaderboard-table">
-                <caption>메뉴 정보 기여 순위</caption>
-                <thead>
-                  <tr><th>순위</th><th>기여자</th><th>포인트</th><th>사용</th><th>갱신</th></tr>
-                </thead>
-                <tbody id="leaderboard-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   </main>
@@ -201,8 +124,6 @@
       <p id="permission-browser-note" class="permission-browser-note">한 번 탭한 뒤 브라우저 권한 창이 열리면 브라우저의 허용 버튼을 눌러주세요.</p>
     </div>
   </section>
-
-  <video id="camera-feed" class="camera-feed" autoplay playsinline muted aria-hidden="true"></video>
 
   <div hidden aria-hidden="true">
     <button id="btn-kiosk-starbucks" type="button"></button>
