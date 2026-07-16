@@ -32,5 +32,8 @@ Thumbs.db
 test-results/
 playwright-report/
 
+# Generated frontend build output
+dist/
+
 # Large PDF guidebooks
 *.pdf
